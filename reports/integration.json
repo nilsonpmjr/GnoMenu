@@ -1,0 +1,57 @@
+{
+  "gmenu": {
+    "success": true,
+    "passed": [
+      "recursive exported menus load for two independent windows",
+      "native application menu, settings fallback and app-scoped dispatch",
+      "an application-menu-only source retains its separate identity",
+      "disabled actions and incompatible targets are rejected",
+      "actions reach only their bound window",
+      "actions-only profiles expose only compatible exports and keep window scope",
+      "boolean, radio and enabled state changes propagate",
+      "state refresh retains valid clicks while rejecting nodes from other windows",
+      "live structural menu changes propagate",
+      "replaced menu positions reject obsolete action identities",
+      "oversized remote menus are bounded and marked as truncated",
+      "source disposal is idempotent and stale activation is rejected",
+      "owner disappearance clears the source"
+    ]
+  },
+  "dbusmenu": {
+    "success": true,
+    "passed": [
+      "DBusMenu hierarchy, visibility, separators and toggle properties",
+      "events retain source, remote item ID and timestamp",
+      "property changes propagate and old snapshots reject activation",
+      "removed properties restore protocol defaults",
+      "lazy submenus prepare correctly without refresh feedback loops",
+      "revisions arriving during an in-flight query discard obsolete responses",
+      "request timeouts clear state and a subsequent update recovers",
+      "oversized DBusMenu models are bounded and marked truncated",
+      "disposal cancels pending work and rejects stale activation",
+      "disappearing DBus owner clears its source"
+    ]
+  },
+  "registrar": {
+    "success": true,
+    "passed": [
+      "registrar preserves exact window IDs, object paths and unique exporters",
+      "registry updates require the original registering connection",
+      "registration lifecycle signals track each window independently",
+      "exporter disconnect removes its registrations without affecting other apps",
+      "zero-ID declarations never alias another registered window",
+      "an existing registrar cannot be replaced by the default name request"
+    ]
+  },
+  "discovery": {
+    "success": true,
+    "passed": [
+      "registrar declarations resolve to the exact exporter and menu source",
+      "declared window changes route actions only to the selected menu",
+      "rapid target changes cancel obsolete registrar queries",
+      "unregistering or selecting an unknown window clears the active source",
+      "zero and absent window identities never select a menu",
+      "lost registrar and discovery disposal invalidate sources and silence callbacks"
+    ]
+  }
+}

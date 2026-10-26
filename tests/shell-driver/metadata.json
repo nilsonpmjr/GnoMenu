@@ -1,0 +1,7 @@
+{
+  "uuid": "gnomenu-test@nilsonpmjr.local",
+  "name": "GnoMenu Test Driver",
+  "description": "Private-session integration driver. Do not install in the desktop session.",
+  "shell-version": ["50"],
+  "version": 1
+}

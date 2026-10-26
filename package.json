@@ -1,0 +1,12 @@
+{
+  "name": "gnomenu-development",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "lint": "eslint extension tests/*.js tests/shell-driver"
+  },
+  "devDependencies": {
+    "eslint": "10.13.0"
+  }
+}

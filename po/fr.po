@@ -1,0 +1,92 @@
+# GnoMenu translations: fr.
+# Native application menu labels must not be translated by GnoMenu.
+msgid ""
+msgstr "Project-Id-Version: GnoMenu 0.1\nReport-Msgid-Bugs-To: \nPO-Revision-Date: 2026-10-26 00:00+0000\nLast-Translator: GnoMenu contributors\nLanguage-Team: fr\nLanguage: fr\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nPlural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "No menu available"
+msgstr "Aucun menu disponible"
+
+msgid "Loading menu…"
+msgstr "Chargement du menu…"
+
+msgid "Application disconnected"
+msgstr "Application déconnectée"
+
+msgid "Some menu items could not be displayed"
+msgstr "Certains éléments du menu n’ont pas pu être affichés"
+
+msgid "No menu items available"
+msgstr "Aucun élément de menu disponible"
+
+msgid "More"
+msgstr "Plus"
+
+msgid "Menu"
+msgstr "Menu"
+
+msgid "Application actions unavailable"
+msgstr "Actions de l’application indisponibles"
+
+msgid "Incomplete menu"
+msgstr "Menu incomplet"
+
+msgid "Preferences…"
+msgstr "Préférences…"
+
+msgid "About…"
+msgstr "À propos…"
+
+msgid "Quit"
+msgstr "Quitter"
+
+msgid "Partial menu"
+msgstr "Menu partiel"
+
+msgid "File"
+msgstr "Fichier"
+
+msgid "New Window"
+msgstr "Nouvelle fenêtre"
+
+msgid "New Tab"
+msgstr "Nouvel onglet"
+
+msgid "Reopen Closed Tab"
+msgstr "Rouvrir l’onglet fermé"
+
+msgid "Close Tab"
+msgstr "Fermer l’onglet"
+
+msgid "Edit"
+msgstr "Édition"
+
+msgid "Undo"
+msgstr "Annuler"
+
+msgid "Redo"
+msgstr "Rétablir"
+
+msgid "View"
+msgstr "Affichage"
+
+msgid "Show Sidebar"
+msgstr "Afficher le panneau latéral"
+
+msgid "File Transfers"
+msgstr "Transferts de fichiers"
+
+msgid "Go"
+msgstr "Aller"
+
+msgid "Home"
+msgstr "Dossier personnel"
+
+msgid "Help"
+msgstr "Aide"
+
+msgid "Keyboard Shortcuts"
+msgstr "Raccourcis clavier"
+
+msgid "Read-Only Terminal"
+msgstr "Terminal en lecture seule"
+

@@ -1,0 +1,372 @@
+{
+  "product": "GnoMenu",
+  "timestamp_utc": "2026-10-26T21:07:57.058270+00:00",
+  "gnome_shell": "GNOME Shell 50.6",
+  "transport_integration": {
+    "gmenu": {
+      "success": true,
+      "passed": [
+        "recursive exported menus load for two independent windows",
+        "native application menu, settings fallback and app-scoped dispatch",
+        "an application-menu-only source retains its separate identity",
+        "disabled actions and incompatible targets are rejected",
+        "actions reach only their bound window",
+        "actions-only profiles expose only compatible exports and keep window scope",
+        "boolean, radio and enabled state changes propagate",
+        "live structural menu changes propagate",
+        "oversized remote menus are bounded and marked as truncated",
+        "source disposal is idempotent and stale activation is rejected",
+        "owner disappearance clears the source"
+      ]
+    },
+    "dbusmenu": {
+      "success": true,
+      "passed": [
+        "DBusMenu hierarchy, visibility, separators and toggle properties",
+        "events retain source, remote item ID and timestamp",
+        "property changes propagate and old snapshots reject activation",
+        "removed properties restore protocol defaults",
+        "lazy submenus prepare correctly without refresh feedback loops",
+        "revisions arriving during an in-flight query discard obsolete responses",
+        "request timeouts clear state and a subsequent update recovers",
+        "oversized DBusMenu models are bounded and marked truncated",
+        "disposal cancels pending work and rejects stale activation",
+        "disappearing DBus owner clears its source"
+      ]
+    },
+    "registrar": {
+      "success": true,
+      "passed": [
+        "registrar preserves exact window IDs, object paths and unique exporters",
+        "registry updates require the original registering connection",
+        "registration lifecycle signals track each window independently",
+        "exporter disconnect removes its registrations without affecting other apps",
+        "zero-ID declarations never alias another registered window",
+        "an existing registrar cannot be replaced by the default name request"
+      ]
+    },
+    "discovery": {
+      "success": true,
+      "passed": [
+        "registrar declarations resolve to the exact exporter and menu source",
+        "declared window changes route actions only to the selected menu",
+        "rapid target changes cancel obsolete registrar queries",
+        "unregistering or selecting an unknown window clears the active source",
+        "zero and absent window identities never select a menu",
+        "lost registrar and discovery disposal invalidate sources and silence callbacks"
+      ]
+    }
+  },
+  "shell_integration": {
+    "success": true,
+    "passed": [
+      "Wayland window metadata selects exported menu and renders panel headings",
+      "Session language translates GnoMenu labels while preserving exported application labels",
+      "App name comes first and its settings command opens the actual application dialog",
+      "All dropdowns align their left edge with the corresponding title",
+      "RTL dropdowns align their right edge with the title",
+      "Dropdowns remain within the monitor work area near its edge",
+      "Panel popup activation reaches the first GTK window",
+      "Focus switches source and commands stay isolated between GTK windows",
+      "Checkbox, sensitivity and dynamic structure update in Shell actors",
+      "Closing the active window discards its menu and the remaining window works",
+      "Application without a menu clears the old source and displays unavailable status",
+      "Disabling extension removes panel actors, sources and registrations",
+      "Extension can be enabled again without restarting Shell"
+    ]
+  },
+  "shell_portuguese": {
+    "success": true,
+    "passed": [
+      "Wayland window metadata selects exported menu and renders panel headings",
+      "Session language translates GnoMenu labels while preserving exported application labels",
+      "App name comes first and its settings command opens the actual application dialog",
+      "All dropdowns align their left edge with the corresponding title",
+      "RTL dropdowns align their right edge with the title",
+      "Dropdowns remain within the monitor work area near its edge",
+      "Panel popup activation reaches the first GTK window",
+      "Focus switches source and commands stay isolated between GTK windows",
+      "Checkbox, sensitivity and dynamic structure update in Shell actors",
+      "Closing the active window discards its menu and the remaining window works",
+      "Application without a menu clears the old source and displays unavailable status",
+      "Disabling extension removes panel actors, sources and registrations",
+      "Extension can be enabled again without restarting Shell"
+    ]
+  },
+  "localization": [
+    {
+      "case": "pt_BR",
+      "success": true,
+      "languages": [
+        "pt_BR.UTF-8",
+        "pt_BR",
+        "pt.UTF-8",
+        "pt",
+        "C"
+      ],
+      "translated": {
+        "Preferences…": "Configurações…",
+        "About…": "Sobre…",
+        "Quit": "Sair"
+      },
+      "nativeQuit": "Quit",
+      "nativeHeading": "_File"
+    },
+    {
+      "case": "pt_PT",
+      "success": true,
+      "languages": [
+        "pt_PT.UTF-8",
+        "pt_PT",
+        "pt.UTF-8",
+        "pt",
+        "C"
+      ],
+      "translated": {
+        "Preferences…": "Definições…",
+        "About…": "Sobre…",
+        "Quit": "Sair"
+      },
+      "nativeQuit": "Quit",
+      "nativeHeading": "_File"
+    },
+    {
+      "case": "es_MX",
+      "success": true,
+      "languages": [
+        "es_MX.UTF-8",
+        "es_MX",
+        "es.UTF-8",
+        "es",
+        "C"
+      ],
+      "translated": {
+        "Preferences…": "Preferencias…",
+        "About…": "Acerca de…",
+        "Quit": "Salir"
+      },
+      "nativeQuit": "Quit",
+      "nativeHeading": "_File"
+    },
+    {
+      "case": "fr_CA",
+      "success": true,
+      "languages": [
+        "fr_CA.UTF-8",
+        "fr_CA",
+        "fr.UTF-8",
+        "fr",
+        "C"
+      ],
+      "translated": {
+        "Preferences…": "Préférences…",
+        "About…": "À propos…",
+        "Quit": "Quitter"
+      },
+      "nativeQuit": "Quit",
+      "nativeHeading": "_File"
+    },
+    {
+      "case": "de_DE",
+      "success": true,
+      "languages": [
+        "de_DE.UTF-8",
+        "de_DE",
+        "de.UTF-8",
+        "de",
+        "C"
+      ],
+      "translated": {
+        "Preferences…": "Einstellungen…",
+        "About…": "Info…",
+        "Quit": "Beenden"
+      },
+      "nativeQuit": "Quit",
+      "nativeHeading": "_File"
+    },
+    {
+      "case": "it_IT",
+      "success": true,
+      "languages": [
+        "it_IT.UTF-8",
+        "it_IT",
+        "it.UTF-8",
+        "it",
+        "C"
+      ],
+      "translated": {
+        "Preferences…": "Preferenze…",
+        "About…": "Informazioni…",
+        "Quit": "Esci"
+      },
+      "nativeQuit": "Quit",
+      "nativeHeading": "_File"
+    },
+    {
+      "case": "en_US",
+      "success": true,
+      "languages": [
+        "en_US.UTF-8",
+        "en_US",
+        "en.UTF-8",
+        "en",
+        "C"
+      ],
+      "translated": {
+        "Preferences…": "Preferences…",
+        "About…": "About…",
+        "Quit": "Quit"
+      },
+      "nativeQuit": "Quit",
+      "nativeHeading": "_File"
+    },
+    {
+      "case": "unsupported_ja",
+      "success": true,
+      "languages": [
+        "ja_JP.UTF-8",
+        "ja_JP",
+        "ja.UTF-8",
+        "ja",
+        "C"
+      ],
+      "translated": {
+        "Preferences…": "Preferences…",
+        "About…": "About…",
+        "Quit": "Quit"
+      },
+      "nativeQuit": "Quit",
+      "nativeHeading": "_File"
+    },
+    {
+      "case": "messages_override",
+      "success": true,
+      "languages": [
+        "es_ES.UTF-8",
+        "es_ES",
+        "es.UTF-8",
+        "es",
+        "C"
+      ],
+      "translated": {
+        "Preferences…": "Preferencias…",
+        "About…": "Acerca de…",
+        "Quit": "Salir"
+      },
+      "nativeQuit": "Quit",
+      "nativeHeading": "_File"
+    },
+    {
+      "case": "language_priority",
+      "success": true,
+      "languages": [
+        "xx",
+        "fr",
+        "es",
+        "C"
+      ],
+      "translated": {
+        "Preferences…": "Préférences…",
+        "About…": "À propos…",
+        "Quit": "Quitter"
+      },
+      "nativeQuit": "Quit",
+      "nativeHeading": "_File"
+    }
+  ],
+  "real_apps": {
+    "inherited": {
+      "success": true,
+      "passed": [
+        "Real Nautilus is discovered without a menu model and displays its localized partial menu",
+        "Global New Tab and Close Tab affect only the selected real Nautilus window",
+        "Real Ptyxis displays preferences, window/tab commands and window-scoped read-only state",
+        "Ptyxis action state stays isolated between two real windows and can be restored",
+        "Extension cleans up its real-app sources and panel buttons on disable"
+      ]
+    },
+    "pt_BR": {
+      "success": true,
+      "passed": [
+        "Real Nautilus is discovered without a menu model and displays its localized partial menu",
+        "Global New Tab and Close Tab affect only the selected real Nautilus window",
+        "Real Ptyxis displays preferences, window/tab commands and window-scoped read-only state",
+        "Ptyxis action state stays isolated between two real windows and can be restored",
+        "Extension cleans up its real-app sources and panel buttons on disable"
+      ]
+    },
+    "versions": [
+      "nautilus-50.4-1.fc44.x86_64",
+      "ptyxis-50.1-2.fc44.x86_64"
+    ]
+  },
+  "shell_log_check": {
+    "gjs_critical_errors": 0,
+    "js_errors": 0
+  },
+  "dropdown_alignment": [
+    {
+      "title": "GnoMenu Demo",
+      "actorX": 72,
+      "buttonX": 75,
+      "buttonY": 0,
+      "buttonWidth": 134,
+      "buttonHeight": 32,
+      "menuX": 75,
+      "menuY": 32,
+      "menuWidth": 220
+    },
+    {
+      "title": "Arquivo",
+      "actorX": 212,
+      "buttonX": 215,
+      "buttonY": 0,
+      "buttonWidth": 70,
+      "buttonHeight": 32,
+      "menuX": 215,
+      "menuY": 32,
+      "menuWidth": 281
+    },
+    {
+      "title": "Exibir",
+      "actorX": 288,
+      "buttonX": 291,
+      "buttonY": 0,
+      "buttonWidth": 54,
+      "buttonHeight": 32,
+      "menuX": 291,
+      "menuY": 32,
+      "menuWidth": 220
+    },
+    {
+      "direction": "rtl",
+      "actorX": 288,
+      "buttonX": 291,
+      "buttonY": 0,
+      "buttonWidth": 54,
+      "buttonHeight": 32,
+      "menuX": 125,
+      "menuY": 32,
+      "menuWidth": 220
+    },
+    {
+      "clamped": true,
+      "actorX": 1220,
+      "buttonX": 1223,
+      "buttonY": 0,
+      "buttonWidth": 54,
+      "buttonHeight": 32,
+      "menuX": 1054,
+      "menuY": 32,
+      "menuWidth": 220
+    }
+  ],
+  "bundle_sha256": "b205fb35f8459382da5583b4e8e7f32f3347be7b76e160e6e8a1b8a422b732d2",
+  "limits": [
+    "Shell actor activation is programmatic; physical input, full keyboard navigation and accessibility are not verified.",
+    "DBusMenu adapter is tested independently; automatic source-to-window discovery and panel integration are pending.",
+    "AppMenu registrar was exercised only on an isolated bus; it is not installed or started by the extension.",
+    "Registry-to-source discovery uses explicitly supplied window IDs; it is not yet connected to Mutter window discovery.",
+    "Nautilus 50.4 and Ptyxis 50.1 have partial action-based support; complete native menus and other priority applications remain unverified."
+  ]
+}

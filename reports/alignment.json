@@ -1,0 +1,57 @@
+[
+  {
+    "title": "GnoMenu Demo",
+    "actorX": 72,
+    "buttonX": 75,
+    "buttonY": 0,
+    "buttonWidth": 134,
+    "buttonHeight": 32,
+    "menuX": 75,
+    "menuY": 32,
+    "menuWidth": 220
+  },
+  {
+    "title": "Arquivo",
+    "actorX": 212,
+    "buttonX": 215,
+    "buttonY": 0,
+    "buttonWidth": 70,
+    "buttonHeight": 32,
+    "menuX": 215,
+    "menuY": 32,
+    "menuWidth": 281
+  },
+  {
+    "title": "Exibir",
+    "actorX": 288,
+    "buttonX": 291,
+    "buttonY": 0,
+    "buttonWidth": 54,
+    "buttonHeight": 32,
+    "menuX": 291,
+    "menuY": 32,
+    "menuWidth": 220
+  },
+  {
+    "direction": "rtl",
+    "actorX": 288,
+    "buttonX": 291,
+    "buttonY": 0,
+    "buttonWidth": 54,
+    "buttonHeight": 32,
+    "menuX": 125,
+    "menuY": 32,
+    "menuWidth": 220
+  },
+  {
+    "clamped": true,
+    "actorX": 1220,
+    "buttonX": 1223,
+    "buttonY": 0,
+    "buttonWidth": 54,
+    "buttonHeight": 32,
+    "menuX": 1054,
+    "menuY": 32,
+    "menuWidth": 220
+  }
+]

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+build/
+reports/dev-session/
+reports/demo-session/
+reports/
+reference-kde/
+extension/locale/
+.firecrawl/
+node_modules/

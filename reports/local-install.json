@@ -1,0 +1,10 @@
+{
+  "timestamp_utc": "2026-10-26T21:10:50.865768+00:00",
+  "uuid": "gnomenu@nilsonpmjr.local",
+  "path": "/home/nilsonpmjr/.local/share/gnome-shell/extensions/gnomenu@nilsonpmjr.local",
+  "files_match_verified_bundle": true,
+  "enabled_for_next_session": true,
+  "global_extensions_enabled": true,
+  "needs_new_gnome_session": true,
+  "bundle_sha256": "b205fb35f8459382da5583b4e8e7f32f3347be7b76e160e6e8a1b8a422b732d2"
+}
