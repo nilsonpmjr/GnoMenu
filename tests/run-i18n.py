@@ -4,12 +4,22 @@
 """Exercise real gettext and GMenu imports in separate locale-inheriting processes."""
 import json
 import os
+import locale as system_locale
 from pathlib import Path
 import select
 import subprocess
 import sys
 
 root = Path(__file__).resolve().parent.parent
+(root / 'reports').mkdir(exist_ok=True)
+required_locales = ['pt_BR.UTF-8', 'pt_PT.UTF-8', 'es_MX.UTF-8', 'fr_CA.UTF-8',
+                    'de_DE.UTF-8', 'it_IT.UTF-8', 'en_US.UTF-8', 'ja_JP.UTF-8', 'es_ES.UTF-8']
+for required in required_locales:
+    try:
+        system_locale.setlocale(system_locale.LC_MESSAGES, required)
+    except system_locale.Error as error:
+        raise RuntimeError(f'Test locale data is missing: {required}. Install the corresponding glibc language pack.') from error
+system_locale.setlocale(system_locale.LC_MESSAGES, '')
 subprocess.run([sys.executable, str(root / 'tools/build-translations.py')], check=True)
 environment = dict(os.environ, GIO_USE_VFS='local')
 exporter = subprocess.Popen([sys.executable, str(root / 'fixtures/gmenu-service.py')],

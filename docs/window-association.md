@@ -1,40 +1,23 @@
-# Associação entre janela e menu — estado da investigação
+# Window association research
 
-## Fluxo já validado
+## Validated protocol pipeline
 
-`RegisterWindow(ID, caminho)` → registrador fixa o proprietário da conexão →
-`AppMenuDiscovery.setWindowId(ID)` → consulta assíncrona ao proprietário atual
-do registrador → descritor com proprietário único do exportador → DBusMenu.
+`RegisterWindow(ID, path)` → registrar pins the calling connection → declared-ID lookup → unique exporter descriptor → DBusMenu source.
 
-A bancada executa esse fluxo com duas declarações de janela do mesmo processo
-exportador. Comandos chegam somente ao menu selecionado. Trocas rápidas de alvo
-cancelam consultas anteriores; remoção de cadastro, perda do registrador e
-encerramento do consumidor invalidam a fonte. ID desconhecido, ausente ou zero
-não seleciona outro menu.
+Private-bus tests use two menu declarations from the same exporter. They verify action routing, rapid target changes, unregistration, registrar loss and disposal. Unknown, missing and zero IDs do not select an unrelated menu.
 
-O módulo `extension/appmenuDiscovery.js` não consulta PID/título para adivinhar
-uma fonte. Não inicia serviços e não toma o nome de outro registrador. Os testes
-usam barramento privado e IDs declarados pela bancada; isso ainda não comprova
-a ligação com janelas reais do Mutter.
+`extension/appmenuDiscovery.js` consumes an explicitly supplied X11 window ID. It does not infer a Wayland surface from an application name, PID or tray menu. It does not start services or replace another registrar.
 
-## Fronteira pendente no GNOME 50.6
+## Boundary in GNOME 50.6
 
-Na introspecção local, `Meta.Window` oferece os caminhos GTK utilizados pelo
-adaptador GMenu, além de tipo de cliente, ID interno e descrição. Não encontramos
-`get_xwindow` no protótipo público consultado.
+The local `Meta.Window` interface exposes GTK paths used by the GMenu integration, client type, an internal ID and a description. The inspected public prototype did not expose `get_xwindow`.
 
-O [código do Mutter 50.6](https://github.com/GNOME/mutter/blob/50.6/src/core/window.c)
-atribui `window->id` com o gerador de IDs do display; `get_id()` devolve esse
-campo. A descrição é construída de forma diferente para XWayland e Wayland.
-Isso não autoriza tratar o ID interno como XID, nem transformar o formato textual
-da descrição em um contrato estável de produção.
+In [Mutter 50.6 source](https://github.com/GNOME/mutter/blob/50.6/src/core/window.c), the internal window ID is assigned by the display's ID generator. Descriptions are formatted differently for XWayland and Wayland windows. Neither fact establishes that an internal ID is an XID or that the description is a stable production parsing contract.
 
-Decisão atual: não ligar automaticamente esse resolvedor ao foco do Shell até
-validar uma identidade correta para cada backend. O suporte nativo Wayland
-precisará de metadados cooperativos/protocolo apropriado; o suporte XWayland
-precisa obter e validar seu identificador de janela. A implementação não força
-aplicativos Wayland a usar XWayland.
+The declared-ID resolver therefore remains outside the installed panel integration until the actual window identity is validated for each backend.
 
-Próxima bancada: janelas XWayland reais, com títulos iguais e mesmo PID, para
-provar a identidade sem depender do nome do aplicativo. Em paralelo, investigar
-metadados publicados pelos exportadores reais de Signal/Obsidian.
+## Next experiment
+
+Use real XWayland windows with identical titles and the same PID to prove identity independently of application naming. Investigate metadata published by the actual Signal and Obsidian exporters in parallel.
+
+Native Wayland support needs appropriate cooperative metadata or a suitable protocol. GnoMenu does not force applications to switch display backends.

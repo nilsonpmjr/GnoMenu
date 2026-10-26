@@ -25,7 +25,10 @@ jobs:
     container: registry.fedoraproject.org/fedora:44
     steps:
       - name: Install test dependencies
-        run: dnf -y install git gjs python3-gobject gettext dbus-daemon
+        run: >-
+          dnf -y install git gjs python3-gobject gettext dbus-daemon
+          glibc-langpack-en glibc-langpack-pt glibc-langpack-es glibc-langpack-fr
+          glibc-langpack-de glibc-langpack-it glibc-langpack-ja
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check Python syntax
         run: python3 -m compileall -q broker fixtures tests tools

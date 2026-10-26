@@ -42,6 +42,7 @@ export default class GnoMenu extends Extension {
         this._renderId = 0;
         this._focusId = 0;
         this._rendering = false;
+        this._renderedEpoch = null;
         this._tree = [];
         this._appTree = [];
         this._partial = false;

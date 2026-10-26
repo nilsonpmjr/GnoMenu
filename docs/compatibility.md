@@ -1,71 +1,47 @@
-# Compatibilidade real — GnoMenu
+# Compatibility
 
-Ambiente validado: GNOME Shell 50.6 / Wayland, Bazzite 44.
+Validated environment: GNOME Shell 50.6 / Wayland, Bazzite 44.
 
-| Aplicativo | Versão/pacote | Suporte atual |
+| Application | Tested version/package | Current integration |
 | --- | --- | --- |
-| Nautilus | 50.4-1.fc44, RPM | Parcial: preferências, sobre/sair, janela/abas, desfazer/refazer, barra lateral, transferências, pasta pessoal e ajuda, quando a ação correspondente está exportada |
-| Ptyxis | 50.1-2.fc44, RPM | Parcial: preferências/sobre, nova janela/aba e modo somente leitura da aba atual |
-| Outros GTK com ações exportadas | Ainda sem validação individual | Descoberta genérica de ações convencionais de preferências/sobre/sair, quando disponíveis sem parâmetros |
-| Aplicativos com GMenu exportado | Validados na bancada | Importação do modelo original tem precedência sobre menus parciais |
-| Signal, Obsidian e Firefox | Integração pendente | Não declarados compatíveis nesta etapa |
+| Nautilus | 50.4-1.fc44, RPM | Partial application/window commands |
+| Ptyxis | 50.1-2.fc44, RPM | Partial application commands and tab read-only state |
+| Other GTK applications | No individual guarantee | Conventional preferences/about/quit actions when exported |
+| Exported GMenu | Integration fixtures | Imported original menu model |
+| Signal, Obsidian, Firefox | Pending | No supported integration claimed |
 
-## O que significa parcial
+## Partial menus
 
-Nautilus e Ptyxis não publicaram modelos de menu na inspeção desta máquina,
-mas publicam grupos de ações. O GnoMenu constrói uma apresentação dessas ações,
-com rótulos traduzidos, e identifica o primeiro menu com **Menu parcial**.
+The tested Nautilus and Ptyxis builds export action groups without publishing a complete menu model. GnoMenu constructs a translated presentation of compatible exported commands and marks it **Partial menu**.
 
-Não se trata da captura completa de seus menus originais. Comandos de seleção
-de arquivos, copiar/colar e outros comandos internos não exportados continuam
-disponíveis nas interfaces dos próprios aplicativos. O GnoMenu não oculta os
-menus locais nem inventa atalhos para executar ações que não encontrou.
+Nautilus exposes preferences, about/quit, window/tab operations, undo/redo, sidebar, transfers, home and help commands when those actions exist. Ptyxis exposes preferences/about, new window/tab and the current tab's read-only state.
 
-Os adaptadores só apresentam comandos com nome e tipo de parâmetro compatíveis.
-Respeitam o estado habilitado e as seleções publicadas. A identidade da janela
-e os caminhos D-Bus vêm dos metadados GTK do Mutter; não se escolhe uma janela
-por título ou PID.
+Selection commands, copy/paste and other internal commands may remain available only in the applications themselves. GnoMenu keeps local menus intact. It does not invent actions or guess required parameters.
 
-## Evidência
+Application paths and unique bus names come from the Mutter window's GTK metadata. Application names and PIDs are not used to guess a target window.
 
-`python3 tests/run-shell.py --real-apps` abre duas janelas reais de cada programa
-num GNOME/Wayland privado. O Nautilus navega apenas em pastas temporárias vazias.
-Os terminais executam `sleep`, sem carregar arquivos de inicialização do shell.
-
-Os testes confirmam:
-
-- O Nautilus é descoberto sem modelo GMenu e recebe o menu parcial localizado.
-- Nova aba e Fechar aba executados pelo painel afetam somente a janela escolhida.
-  Um observador AT-SPI em barramento privado verifica a alteração da interface.
-- O modo somente leitura do Ptyxis muda na janela escolhida, sem alterar a outra,
-  e pode ser restaurado pelo menu global.
-- Preferências e outros comandos realmente exportados estão disponíveis, e o
-  ciclo de vida da extensão remove corretamente as fontes e os botões do painel.
-
-O observador de acessibilidade pertence apenas aos testes; não é necessário
-ativar acessibilidade no desktop para usar o GnoMenu. As capturas e observações
-ficam em `reports/nautilus-menu.png`, `reports/ptyxis-menu.png` e
-`reports/nautilus-tabs.json` depois da verificação completa.
-
-Para experimentar os aplicativos reais numa janela de desenvolvimento:
+## Real-application verification
 
 ```bash
-python3 tools/dev-session.py --real-apps --locale pt_BR.UTF-8
+python3 tests/run-shell.py --real-apps
+python3 tests/run-shell.py --real-apps --locale pt_BR.UTF-8
 ```
 
-## Desktop principal
+The harness opens two real windows per application in a private GNOME session:
 
-A demonstração é outro compositor e outro barramento: aplicativos abertos no
-desktop principal não pertencem àquela sessão de desenvolvimento.
+- Nautilus browses empty temporary directories.
+- Ptyxis runs `sleep` instead of loading shell startup files.
+- Nautilus New Tab/Close Tab effects are observed through a private AT-SPI bus.
+- Ptyxis read-only state changes only in the selected window and is restored.
+- Application preferences and compatible exported commands are present.
+- Disabling GnoMenu disposes its sources and panel actors.
 
-Para instalar a extensão no usuário e habilitá-la para o próximo login:
+The accessibility observer is test infrastructure. The runtime extension does not require enabling a screen reader or accessing the desktop accessibility tree.
 
-```bash
-python3 tools/install-local.py
-```
+Results and captures are generated locally under `reports/`.
 
-O instalador preserva as demais extensões e não encerra a sessão. No GNOME 50,
-uma extensão nova instalada localmente precisa de uma nova sessão para ser
-descoberta. A API D-Bus `ReloadExtension` foi conferida no Shell instalado e
-responde como não suportada; não usamos avaliação de JavaScript ou alterações
-internas do Shell para contornar essa limitação.
+## Desktop versus development window
+
+The development window has its own compositor and session bus. An application launched on the normal desktop is outside that session.
+
+Use `python3 tools/install-local.py` to install for the current user, then log out and back in to load a new local extension. The installer preserves other extensions and never logs the user out automatically.

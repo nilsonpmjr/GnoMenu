@@ -41,6 +41,11 @@ export default class ShellTestDriver extends Extension {
         const reportPath = GLib.getenv('GNOMENU_REPORT');
         if (!reportPath)
             return;
+        // The manager may rebase this driver while the tested extension is
+        // disabled. Keep the existing run; do not launch a second test run.
+        if (this._started)
+            return;
+        this._started = true;
         const passed = [];
         const run = GLib.getenv('GNOMENU_REAL_APPS') === '1' ? this._runRealApps(passed) : this._run(passed);
         run.then(() => {

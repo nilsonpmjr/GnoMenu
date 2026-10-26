@@ -14,6 +14,7 @@ python = sys.executable
 metadata = json.loads((root / 'extension/metadata.json').read_text())
 bundle = root / f'build/{metadata["uuid"]}.shell-extension.zip'
 for command in ([python, "tools/package.py"],
+                [python, "tools/audit-release.py"],
                 ["npm", "run", "lint"],
                 ["dbus-run-session", "--", python, "tests/run-integration.py"],
                 ["dbus-run-session", "--", python, "tests/run-i18n.py"],

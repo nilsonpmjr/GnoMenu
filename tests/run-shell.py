@@ -183,7 +183,7 @@ def main():
                     time.sleep(0.2)
                 result = json.loads(result_path.read_text())
                 log = (report_dir / 'shell.log').read_text()
-                if 'Gjs-CRITICAL' in log or 'JS ERROR' in log:
+                if 'Gjs-CRITICAL' in log or 'GNOME Shell-CRITICAL' in log or 'JS ERROR' in log:
                     result['success'] = False
                     result['error'] = 'Critical GJS errors were logged; inspect shell.log'
                     result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2))

@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 root = Path(__file__).resolve().parent.parent
+(root / 'reports').mkdir(exist_ok=True)
 os.environ['GIO_USE_VFS'] = 'local'
 results = {}
 

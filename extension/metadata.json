@@ -1,8 +1,9 @@
 {
-  "uuid": "gnomenu@nilsonpmjr.local",
-  "name": "GnoMenu",
+  "uuid": "gnomenu@nilsonpmjr.github.io",
+  "name": "GnoMenu Global Menu",
   "description": "Application menus in the top bar, with the application name first.\n\nImports exported GMenu models and provides partial command menus for Nautilus and Ptyxis. Some applications do not export compatible menus. GNOME 50 only.",
   "shell-version": ["50"],
   "gettext-domain": "gnomenu",
-  "version-name": "0.1.0 alpha 1"
+  "version-name": "0.1.0 alpha 1",
+  "url": "https://github.com/nilsonpmjr/GnoMenu"
 }
