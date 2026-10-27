@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: GnoMenu 0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-26 21:48-0300\n"
+"POT-Creation-Date: 2026-10-26 22:14-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,44 +17,44 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension/extension.js:55 extension/extension.js:172
+#: extension/extension.js:56 extension/extension.js:179
 msgid "No menu available"
 msgstr ""
 
-#: extension/extension.js:172
+#: extension/extension.js:179
 msgid "Some menu items could not be displayed"
 msgstr ""
 
-#: extension/extension.js:223
+#: extension/extension.js:230
 msgid "Desktop"
 msgstr ""
 
-#: extension/extension.js:246
+#: extension/extension.js:253
 msgid "More"
 msgstr ""
 
-#: extension/extension.js:249
+#: extension/extension.js:256
 msgid "Menu"
 msgstr ""
 
-#: extension/extension.js:252 extension/actionMenus.js:14
-#: extension/actionMenus.js:36
+#: extension/extension.js:259 extension/actionMenus.js:13
+#: extension/actionMenus.js:35
 msgid "New Window"
 msgstr ""
 
-#: extension/extension.js:253 extension/actionMenus.js:25
+#: extension/extension.js:260 extension/actionMenus.js:24
 msgid "Home"
 msgstr ""
 
-#: extension/extension.js:257
+#: extension/extension.js:264
 msgid "Application actions unavailable"
 msgstr ""
 
-#: extension/extension.js:260
+#: extension/extension.js:267
 msgid "Partial menu"
 msgstr ""
 
-#: extension/extension.js:265
+#: extension/extension.js:272
 msgid "Incomplete menu"
 msgstr ""
 
@@ -70,102 +70,78 @@ msgstr ""
 msgid "Quit"
 msgstr ""
 
-#: extension/actionMenus.js:13 extension/actionMenus.js:35
+#: extension/actionMenus.js:12 extension/actionMenus.js:34
 msgid "File"
 msgstr ""
 
-#: extension/actionMenus.js:14 extension/actionMenus.js:36
+#: extension/actionMenus.js:13 extension/actionMenus.js:35
 msgid "New Tab"
 msgstr ""
 
-#: extension/actionMenus.js:15
+#: extension/actionMenus.js:14
 msgid "Duplicate Window"
 msgstr ""
 
-#: extension/actionMenus.js:16
+#: extension/actionMenus.js:15
 msgid "Reopen Closed Tab"
 msgstr ""
 
-#: extension/actionMenus.js:17
+#: extension/actionMenus.js:16
 msgid "Close Tab"
 msgstr ""
 
-#: extension/actionMenus.js:18
+#: extension/actionMenus.js:17
 msgid "Close Other Tabs"
 msgstr ""
 
-#: extension/actionMenus.js:20
+#: extension/actionMenus.js:19
 msgid "Edit"
 msgstr ""
 
-#: extension/actionMenus.js:20
+#: extension/actionMenus.js:19
 msgid "Undo"
 msgstr ""
 
-#: extension/actionMenus.js:20
+#: extension/actionMenus.js:19
 msgid "Redo"
 msgstr ""
 
-#: extension/actionMenus.js:21 extension/actionMenus.js:38
+#: extension/actionMenus.js:20 extension/actionMenus.js:37
 msgid "View"
 msgstr ""
 
-#: extension/actionMenus.js:22
+#: extension/actionMenus.js:21
 msgid "Show Sidebar"
 msgstr ""
 
-#: extension/actionMenus.js:23
+#: extension/actionMenus.js:22
 msgid "File Transfers"
 msgstr ""
 
-#: extension/actionMenus.js:25
+#: extension/actionMenus.js:24
 msgid "Go"
 msgstr ""
 
-#: extension/actionMenus.js:26
+#: extension/actionMenus.js:25
 msgid "Move Tab Left"
 msgstr ""
 
-#: extension/actionMenus.js:26
+#: extension/actionMenus.js:25
 msgid "Move Tab Right"
 msgstr ""
 
-#: extension/actionMenus.js:27
+#: extension/actionMenus.js:26
 msgid "Move Tab to New Window"
 msgstr ""
 
-#: extension/actionMenus.js:28 extension/actionMenus.js:29
+#: extension/actionMenus.js:27 extension/actionMenus.js:28
 msgid "Help"
 msgstr ""
 
-#: extension/actionMenus.js:29
+#: extension/actionMenus.js:28
 msgid "Keyboard Shortcuts"
 msgstr ""
 
-#: extension/actionMenus.js:38
+#: extension/actionMenus.js:37
 msgid "Read-Only Terminal"
-msgstr ""
-
-#: extension/actionMenus.js:90
-msgid "On"
-msgstr ""
-
-#: extension/actionMenus.js:90
-msgid "Off"
-msgstr ""
-
-#: extension/actionMenus.js:92
-msgid "Force Quit"
-msgstr ""
-
-#: extension/actionMenus.js:93
-msgid "Search Settings…"
-msgstr ""
-
-#: extension/actionMenus.js:94
-msgid "Set as Default Terminal"
-msgstr ""
-
-#: extension/actionMenus.js:108
-msgid "Additional Commands"
 msgstr ""

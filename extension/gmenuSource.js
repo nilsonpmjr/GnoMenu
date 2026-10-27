@@ -130,6 +130,7 @@ export class GMenuSource {
             return items;
         };
         this._applicationMenu = this._appModel ? read(this._appModel, 'app', 0, new Set()) : [];
+        this._snapshot = this._model ? read(this._model, 'root', 0, new Set()) : [];
         const actions = new Set();
         const collect = nodes => {
             for (const node of nodes) {
@@ -139,6 +140,7 @@ export class GMenuSource {
             }
         };
         collect(this._applicationMenu);
+        collect(this._snapshot);
         // GTK4 often publishes application actions without an app-menu model.
         // These are explicit exported actions, not invented shortcuts or flags.
         const appGroup = this._groups.get('app');
@@ -163,12 +165,10 @@ export class GMenuSource {
             this._applicationMenu.push(node);
             actions.add(fullName);
         }
-        this._snapshot = this._model ? read(this._model, 'root', 0, new Set()) :
-            actionMenus(this.descriptor.applicationId,
-                this._resolve.bind(this), this._gettext, this._groups, actions);
+        if (!this._model)
+            this._snapshot = actionMenus(this.descriptor.applicationId,
+                this._resolve.bind(this), this._gettext);
         this.partial = !this._model && (!this._appModel || this._snapshot.length > 0);
-        if (this._snapshot.some(node => node.id === 'actions/menu/additional' && node.children.length >= 256))
-            this.truncated = true;
         const index = nodes => {
             for (const node of nodes) {
                 this._items.set(node.id, node);

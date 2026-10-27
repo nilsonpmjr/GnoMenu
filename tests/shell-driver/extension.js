@@ -139,6 +139,12 @@ export default class ShellTestDriver extends Extension {
             'Real app identity must be shown before its menus');
         assert(extension._buttons[1].get_first_child().text === extension.gettext('File'),
             'Partial menu headings must follow the session language');
+        const expectedHeadings = [tracker.get_window_app(nautilus[0]).get_name(),
+            ...['File', 'Edit', 'View', 'Go', 'Help'].map(title => extension.gettext(title))];
+        assert(JSON.stringify(extension._buttons.map(button => button.get_first_child().text)) ===
+            JSON.stringify(expectedHeadings), 'Files must not gain an invented catch-all heading');
+        assert(!binding('app.kill') && !binding('win.current-location-menu'),
+            'Internal action names without menu placement must not leak into the global menu');
         assert(extension._buttons[0].menu._getMenuItems().some(item => item.label?.text === extension.gettext('Partial menu')),
             'Synthesized menu must be identified as partial');
         passed.push('Real Nautilus is discovered without a menu model and displays its localized partial menu');

@@ -20,7 +20,7 @@ There is no Python helper, application launcher, network client, telemetry or cl
 
 `gmenuSource.js` imports remote models and groups through Gio. Application and window actions use separate paths. Menu traversal is bounded to 512 entries and 12 levels.
 
-Native application menus retain their labels. Conventional application actions provide translated fallback labels when no equivalent native action is present. `actionMenus.js` supplies explicit Nautilus/Ptyxis mappings and generic additional commands for other published actions. Boolean parameter domains and available finite state hints supply typed choices; unknown parameters and non-boolean state-only counters are excluded.
+Native menu models retain their labels, order, sections, nesting and typed targets. Conventional application actions provide translated fallback labels when no equivalent native action is present. `actionMenus.js` supplies explicit partial Nautilus/Ptyxis mappings. Other action identifiers do not become menu items: an action group does not encode menu placement or user-facing captions.
 
 ## Lifetimes
 

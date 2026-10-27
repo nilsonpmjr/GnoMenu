@@ -6,7 +6,7 @@ Validated environment: GNOME Shell 50.6 / Wayland, Bazzite 44.
 | --- | --- | --- |
 | Nautilus | 50.4-1.fc44, RPM | Partial application/window commands |
 | Ptyxis | 50.1-2.fc44, RPM | Partial application commands and tab read-only state |
-| Other GTK applications | No individual guarantee | Generic exported commands and supported typed targets, plus conventional application actions |
+| Other GTK applications | No individual guarantee | Original exported menu models and conventional application actions |
 | Exported GMenu | Integration fixtures | Imported original menu model |
 | Signal, Obsidian, Firefox | Pending | No supported integration claimed |
 
@@ -14,9 +14,11 @@ Validated environment: GNOME Shell 50.6 / Wayland, Bazzite 44.
 
 The tested Nautilus and Ptyxis builds export action groups without publishing a complete menu model. GnoMenu constructs a translated presentation of compatible exported commands and marks it **Partial menu**.
 
-Nautilus exposes preferences, about/quit, window/tab operations, duplicate window, closing other tabs, moving tabs, undo/redo, sidebar, transfers, home and help commands when those actions exist. Ptyxis exposes preferences/about, new window/tab, default-terminal registration and the current tab's read-only state.
+Nautilus exposes preferences, about/quit, window/tab operations, duplicate window, closing other tabs, moving tabs, undo/redo, sidebar, transfers, home and help commands when those actions exist. Ptyxis exposes preferences/about, new window/tab and the current tab's read-only state.
 
-Additional exported actions appear under **Additional Commands**. GnoMenu includes parameterless commands and boolean parameter choices. Other parameter types require an explicit finite set of accepted values; the current string or integer state does not establish the complete choices. The standard D-Bus action protocol does not transmit GAction state hints, so those hints are usually unavailable remotely. Non-boolean state-only exports are omitted because they can represent status counters rather than commands.
+Original menu models supply the labels, order, sections, nesting and typed targets used by native imports. An exported action list supplies none of that layout information. GnoMenu does not turn unknown action identifiers into menu captions, invent a catch-all menu, or guess their placement. Unplaced actions such as Nautilus's `kill` and `current-location-menu` are not exposed as standalone global-menu entries.
+
+The Nautilus/Ptyxis adapters remain a partial presentation of known commands, not a reconstruction of their complete local menu hierarchy. Complete import needs an application/toolkit exporter that publishes the real menu model and the corresponding actions. Menu layouts cannot be recovered reliably from a GAction inventory alone.
 
 Selection commands, copy/paste and other internal commands may remain available only in the applications themselves. These require further application/exporter integration; enumeration cannot expose actions the application keeps private.
 

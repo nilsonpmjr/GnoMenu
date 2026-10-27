@@ -13,11 +13,11 @@ Application menus in the GNOME top bar, with the application name first.
 | Exported GMenu models | Imported menus, sections, submenus, action state and live updates |
 | Nautilus 50.4, RPM | Partial menus built from exported application/window actions |
 | Ptyxis 50.1, RPM | Partial menus, including the current tab's read-only state |
-| Other GTK applications | Exported actions without required arguments, plus boolean parameters and available finite choices |
+| Other GTK applications | Original exported menu models and conventional application actions when available |
 | Signal, Obsidian, Firefox | Compatibility work remains |
 | DBusMenu | Transport, registrar and declared-ID discovery tested in isolation; not connected to the panel |
 
-See [compatibility and limitations](docs/compatibility.md). A **Partial menu** label identifies action-based integration. Unmapped exported actions appear under **Additional Commands**; their fallback names come from the application's action identifiers.
+Original exported menus retain their order, nesting, labels and action targets. An action inventory alone does not describe a menu, so GnoMenu does not generate menu headings or item captions from unplaced action names. See [compatibility and limitations](docs/compatibility.md). A **Partial menu** label identifies the explicit Nautilus/Ptyxis adapters; these are not complete imports of their local menus.
 
 ## Desktop and local menus
 

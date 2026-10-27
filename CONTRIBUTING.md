@@ -30,6 +30,7 @@ The Shell tests run private compositors. Their configuration, session bus and ap
 - Use asynchronous D-Bus operations in runtime code.
 - Pin unique owners and exact window/action paths. Invalidate old sources immediately when the target changes.
 - Preserve exported labels and action parameters. Translate only GnoMenu-owned text.
+- Import menu layout from its actual model. Action identifiers do not establish captions or placement; do not synthesize catch-all menus from action inventories.
 - Present action-based adapters as partial support. Do not advertise a complete native menu without evidence.
 - Do not match windows by application title or PID.
 - Keep research and test dependencies outside the installed ZIP.

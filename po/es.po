@@ -1,128 +1,144 @@
 # GnoMenu translations: es.
 # Native application menu labels must not be translated by GnoMenu.
 msgid ""
-msgstr "Project-Id-Version: GnoMenu 0.1\nReport-Msgid-Bugs-To: \nPO-Revision-Date: 2026-10-26 00:00+0000\nLast-Translator: GnoMenu contributors\nLanguage-Team: es\nLanguage: es\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nPlural-Forms: nplurals=2; plural=(n != 1);\n"
+msgstr ""
+"Project-Id-Version: GnoMenu 0.1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-26 22:14-0300\n"
+"PO-Revision-Date: 2026-10-26 00:00+0000\n"
+"Last-Translator: GnoMenu contributors\n"
+"Language-Team: es\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: extension/extension.js:56 extension/extension.js:179
 msgid "No menu available"
 msgstr "No hay ningún menú disponible"
 
-msgid "Loading menu…"
-msgstr "Cargando menú…"
-
-msgid "Application disconnected"
-msgstr "Aplicación desconectada"
-
+#: extension/extension.js:179
 msgid "Some menu items could not be displayed"
 msgstr "No se pudieron mostrar algunos elementos del menú"
 
-msgid "No menu items available"
-msgstr "No hay elementos de menú disponibles"
-
-msgid "More"
-msgstr "Más"
-
-msgid "Menu"
-msgstr "Menú"
-
-msgid "Application actions unavailable"
-msgstr "Acciones de la aplicación no disponibles"
-
-msgid "Incomplete menu"
-msgstr "Menú incompleto"
-
-msgid "Preferences…"
-msgstr "Preferencias…"
-
-msgid "About…"
-msgstr "Acerca de…"
-
-msgid "Quit"
-msgstr "Salir"
-
-msgid "Partial menu"
-msgstr "Menú parcial"
-
-msgid "File"
-msgstr "Archivo"
-
-msgid "New Window"
-msgstr "Nueva ventana"
-
-msgid "New Tab"
-msgstr "Nueva pestaña"
-
-msgid "Reopen Closed Tab"
-msgstr "Reabrir pestaña cerrada"
-
-msgid "Close Tab"
-msgstr "Cerrar pestaña"
-
-msgid "Edit"
-msgstr "Editar"
-
-msgid "Undo"
-msgstr "Deshacer"
-
-msgid "Redo"
-msgstr "Rehacer"
-
-msgid "View"
-msgstr "Ver"
-
-msgid "Show Sidebar"
-msgstr "Mostrar barra lateral"
-
-msgid "File Transfers"
-msgstr "Transferencias de archivos"
-
-msgid "Go"
-msgstr "Ir"
-
-msgid "Home"
-msgstr "Carpeta personal"
-
-msgid "Help"
-msgstr "Ayuda"
-
-msgid "Keyboard Shortcuts"
-msgstr "Atajos de teclado"
-
-msgid "Read-Only Terminal"
-msgstr "Terminal de solo lectura"
-
+#: extension/extension.js:230
 msgid "Desktop"
 msgstr "Escritorio"
 
-msgid "Additional Commands"
-msgstr "Comandos adicionales"
+#: extension/extension.js:253
+msgid "More"
+msgstr "Más"
 
-msgid "Close Other Tabs"
-msgstr "Cerrar las demás pestañas"
+#: extension/extension.js:256
+msgid "Menu"
+msgstr "Menú"
 
-msgid "Move Tab Left"
-msgstr "Mover pestaña a la izquierda"
+#: extension/extension.js:259 extension/actionMenus.js:13
+#: extension/actionMenus.js:35
+msgid "New Window"
+msgstr "Nueva ventana"
 
-msgid "Move Tab Right"
-msgstr "Mover pestaña a la derecha"
+#: extension/extension.js:260 extension/actionMenus.js:24
+msgid "Home"
+msgstr "Carpeta personal"
 
-msgid "Move Tab to New Window"
-msgstr "Mover pestaña a una ventana nueva"
+#: extension/extension.js:264
+msgid "Application actions unavailable"
+msgstr "Acciones de la aplicación no disponibles"
 
+#: extension/extension.js:267
+msgid "Partial menu"
+msgstr "Menú parcial"
+
+#: extension/extension.js:272
+msgid "Incomplete menu"
+msgstr "Menú incompleto"
+
+#: extension/gmenuSource.js:146 extension/gmenuSource.js:147
+msgid "Preferences…"
+msgstr "Preferencias…"
+
+#: extension/gmenuSource.js:147
+msgid "About…"
+msgstr "Acerca de…"
+
+#: extension/gmenuSource.js:147
+msgid "Quit"
+msgstr "Salir"
+
+#: extension/actionMenus.js:12 extension/actionMenus.js:34
+msgid "File"
+msgstr "Archivo"
+
+#: extension/actionMenus.js:13 extension/actionMenus.js:35
+msgid "New Tab"
+msgstr "Nueva pestaña"
+
+#: extension/actionMenus.js:14
 msgid "Duplicate Window"
 msgstr "Duplicar ventana"
 
-msgid "Force Quit"
-msgstr "Forzar salida"
+#: extension/actionMenus.js:15
+msgid "Reopen Closed Tab"
+msgstr "Reabrir pestaña cerrada"
 
-msgid "Search Settings…"
-msgstr "Configuración de búsqueda…"
+#: extension/actionMenus.js:16
+msgid "Close Tab"
+msgstr "Cerrar pestaña"
 
-msgid "Set as Default Terminal"
-msgstr "Establecer como terminal predeterminado"
+#: extension/actionMenus.js:17
+msgid "Close Other Tabs"
+msgstr "Cerrar las demás pestañas"
 
-msgid "On"
-msgstr "Activado"
+#: extension/actionMenus.js:19
+msgid "Edit"
+msgstr "Editar"
 
-msgid "Off"
-msgstr "Desactivado"
+#: extension/actionMenus.js:19
+msgid "Undo"
+msgstr "Deshacer"
 
+#: extension/actionMenus.js:19
+msgid "Redo"
+msgstr "Rehacer"
+
+#: extension/actionMenus.js:20 extension/actionMenus.js:37
+msgid "View"
+msgstr "Ver"
+
+#: extension/actionMenus.js:21
+msgid "Show Sidebar"
+msgstr "Mostrar barra lateral"
+
+#: extension/actionMenus.js:22
+msgid "File Transfers"
+msgstr "Transferencias de archivos"
+
+#: extension/actionMenus.js:24
+msgid "Go"
+msgstr "Ir"
+
+#: extension/actionMenus.js:25
+msgid "Move Tab Left"
+msgstr "Mover pestaña a la izquierda"
+
+#: extension/actionMenus.js:25
+msgid "Move Tab Right"
+msgstr "Mover pestaña a la derecha"
+
+#: extension/actionMenus.js:26
+msgid "Move Tab to New Window"
+msgstr "Mover pestaña a una ventana nueva"
+
+#: extension/actionMenus.js:27 extension/actionMenus.js:28
+msgid "Help"
+msgstr "Ayuda"
+
+#: extension/actionMenus.js:28
+msgid "Keyboard Shortcuts"
+msgstr "Atajos de teclado"
+
+#: extension/actionMenus.js:37
+msgid "Read-Only Terminal"
+msgstr "Terminal de solo lectura"

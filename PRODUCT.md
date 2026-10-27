@@ -10,7 +10,7 @@ The long-term goal is broad global-menu support across system applications and c
 - Native exported GMenu models, sections, nested menus and live action state.
 - Standard exported preferences/about/quit actions as a fallback.
 - Partial action menus for Nautilus 50.4 and Ptyxis 50.1.
-- Generic additional commands from exported action groups, including typed boolean choices.
+- Native imports preserve menu order, hierarchy, labels and targets; unplaced action identifiers do not create new menus.
 - Every focused app retains its name, including apps without captured commands; Files is the desktop fallback.
 - Reversible local-menubar ownership through exported window visibility actions.
 - Exact window-scoped commands, source disposal and stale-response handling.
@@ -34,6 +34,7 @@ These steps prepare a community extension for the catalog. GNOME approval is a s
 
 ## Compatibility work
 
+- Export original local menu models and their widget actions from applications that currently keep them private, starting with Nautilus/Ptyxis.
 - Prove the association between DBusMenu registrations and actual Mutter windows.
 - Investigate Signal and Obsidian exporters and Flatpak bus policies.
 - Investigate the installed Firefox build separately.

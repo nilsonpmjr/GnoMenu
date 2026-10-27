@@ -89,6 +89,17 @@ async function run() {
         'application menu without a menubar');
     assert(appOnly.snapshot.length === 0, 'Application menu must not be duplicated as a menubar');
     print('PASS: an application-menu-only source retains its separate identity');
+    const placement = new GMenuSource(bus, {busName: owner, menuPath: '/lab/menu/placement',
+        appPath: '/lab/app'}, () => {});
+    sources.push(placement);
+    await waitFor(() => find(placement, 'Native preferences in Edit')?.enabled,
+        'original menu placement loads');
+    assert(placement.snapshot[0].label === 'Native Edit' &&
+        placement.snapshot[0].children[0].label === 'Native preferences in Edit',
+    'Original headings and nested labels must keep their positions');
+    assert(!placement.applicationMenu.some(item => item.action === 'app.preferences'),
+        'An existing native command must not be duplicated into a generated application menu');
+    print('PASS: native command placement is preserved without duplicating it under the app name');
     assert(find(first, '_File').children.some(item => item.kind === 'section'),
         'Section hierarchy is retained');
     assert(!first.activate(find(first, 'Disabled')), 'Disabled action must be rejected');
@@ -121,22 +132,14 @@ async function run() {
     const generic = new GMenuSource(bus, {busName: owner, appPath: '/lab/app',
         windowPath: '/lab/window/1', applicationId: 'org.example.Unprofiled'}, () => {});
     sources.push(generic);
-    await waitFor(() => flatten(generic.snapshot).some(item => item.action === 'win.increment'),
-        'an application without a curated profile exports additional commands');
-    assert(!flatten(generic.snapshot).some(item => item.action === 'app.settings'),
-        'Generic commands must not duplicate preferences under another settings alias');
-    print('PASS: unprofiled applications expose additional exported commands without duplicate settings');
-    const choices = flatten(actionsOnly.snapshot).filter(item => item.action === 'win.parameter-toggle');
-    assert(choices.length === 2 && choices.some(item => item.target.unpack() === true),
-        'Boolean parameter type must supply both valid typed choices');
-    assert(actionsOnly.activate(choices.find(item => item.target.unpack() === true)),
-        'A type-declared boolean target must activate');
-    await waitFor(() => group1.get_action_state('parameter-toggle').unpack(), 'typed command applies');
-    assert(!flatten(actionsOnly.snapshot).some(item => item.action === 'win.mode'),
-        'String choices absent from the D-Bus action protocol must not be guessed');
-    assert(!flatten(actionsOnly.snapshot).some(item => item.action === 'win.counter'),
-        'A state-only counter must not become a fake command');
-    print('PASS: additional commands use typed boolean choices and omit unknown targets and state-only counters');
+    await waitFor(() => generic.applicationMenu.some(item => item.action === 'app.preferences'),
+        'unprofiled application actions finish loading');
+    assert(generic.snapshot.length === 0,
+        'An action inventory without menu placement must not invent a menubar');
+    assert(!flatten(actionsOnly.snapshot).some(item =>
+        item.id.startsWith('actions/extra/') || item.id === 'actions/menu/additional'),
+    'Partial adapters must not append an invented catch-all menu');
+    print('PASS: action inventories without menu placement do not create invented menus');
     first.setCaptured(true);
     await waitFor(() => !group1.get_action_state('show-menubar').unpack(), 'local menubar hides after capture');
     assert(group2.get_action_state('show-menubar').unpack(), 'Other window keeps its local menubar');

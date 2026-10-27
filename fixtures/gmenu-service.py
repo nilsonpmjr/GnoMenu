@@ -38,6 +38,12 @@ application_menu.append('Native settings label', 'app.preferences')
 application_menu.append('Quit', 'app.quit')  # Deliberate translation-key collision.
 menus.append(application_menu)
 registrations.append(bus.export_menu_model('/lab/application/menu', application_menu))
+placement = Gio.Menu()
+edit = Gio.Menu()
+edit.append('Native preferences in Edit', 'app.preferences')
+placement.append_submenu('Native Edit', edit)
+menus.extend([placement, edit])
+registrations.append(bus.export_menu_model('/lab/menu/placement', placement))
 for number in (1, 2):
     group = Gio.SimpleActionGroup()
     groups.append(group)
