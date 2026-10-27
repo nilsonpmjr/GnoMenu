@@ -13,6 +13,11 @@ root = Path(__file__).resolve().parent.parent
 (root / 'reports').mkdir(exist_ok=True)
 os.environ['GIO_USE_VFS'] = 'local'
 results = {}
+probe = subprocess.run([sys.executable, str(root / 'tests/probe-session-test.py')],
+                       capture_output=True, text=True, check=True)
+print(probe.stdout, end='', flush=True)
+results['probe'] = {'success': True,
+                    'passed': [line[6:] for line in probe.stdout.splitlines() if line.startswith('PASS: ')]}
 layout = subprocess.run(['gjs', '-m', str(root / 'tests/files-layout.js')],
                         capture_output=True, text=True, check=True)
 print(layout.stdout, end='', flush=True)
@@ -42,6 +47,13 @@ for transport in ('gmenu', 'dbusmenu', 'registrar', 'discovery'):
     try:
         information = ready(exporter, transport)
         arguments = [str(registrar.pid)] if registrar else []
+        if transport == 'gmenu':
+            diagnostic = subprocess.run([sys.executable, str(root / 'tools/probe-session.py'),
+                                         '--name', information['owner']], timeout=15,
+                                        capture_output=True, text=True, check=True)
+            observed = json.loads(diagnostic.stdout)['applications'][0]
+            assert observed['owner'] == information['owner']
+            assert observed['status'] == 'gmenu-interface-observed'
         result = subprocess.run(['gjs', '-m', str(root / f'tests/{transport}-integration.js'),
                                  information['owner'], *arguments], timeout=35, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True)
@@ -51,6 +63,10 @@ for transport in ('gmenu', 'dbusmenu', 'registrar', 'discovery'):
                                          if line.startswith('PASS: ')]}
         if result.returncode:
             sys.exit(result.returncode)
+        if transport == 'gmenu':
+            message = 'Read-only diagnostic pins the actual exporter and finds its real GMenu interfaces'
+            results[transport]['passed'].append(message)
+            print(f'PASS: {message}', flush=True)
     finally:
         if exporter.poll() is None:
             exporter.terminate()

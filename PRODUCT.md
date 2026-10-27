@@ -2,6 +2,8 @@
 
 The long-term goal is broad global-menu support across system applications and compatible Flatpaks. The first public version will describe its actual coverage rather than promise universal menu extraction.
 
+See the [completion plan](docs/completion-plan.md) for release gates and product priorities. The immediate compatibility work is the [Signal/Obsidian/Firefox investigation](docs/electron-compatibility.md), followed by a normal installation/recovery path for the Files exporter.
+
 ## Implemented
 
 - Application name first, followed by application menus.
@@ -24,6 +26,7 @@ The long-term goal is broad global-menu support across system applications and c
 - Repeated disable/enable checks for source and panel-registration cleanup.
 - DBusMenu transport, registrar and declared-ID discovery in private-bus tests.
 - Runtime-only deterministic ZIP builds, lint and release-package auditing.
+- Read-only session/Flatpak diagnostics distinguish running processes, owned endpoints, permission declarations and observed menu interfaces; they do not infer window ownership from names or PIDs.
 
 ## First public alpha
 

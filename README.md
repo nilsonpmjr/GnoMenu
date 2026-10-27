@@ -4,6 +4,8 @@ Application menus in the GNOME top bar, with the application name first.
 
 **Status: pre-release alpha. GNOME Shell 50 on Wayland.** GnoMenu imports exported GMenu models and offers partial action-based menus for Nautilus and Ptyxis. It has not been submitted to extensions.gnome.org.
 
+See the [completion plan](docs/completion-plan.md) for what remains before a public release and broader application support.
+
 ![GnoMenu with a real Nautilus window](docs/images/nautilus.png)
 
 ## Current support

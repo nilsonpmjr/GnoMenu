@@ -20,4 +20,6 @@ The declared-ID resolver therefore remains outside the installed panel integrati
 
 Use real XWayland windows with identical titles and the same PID to prove identity independently of application naming. Investigate metadata published by the actual Signal and Obsidian exporters in parallel.
 
+The [installed Electron/Flatpak investigation](electron-compatibility.md) confirms static Electron menu construction and records sandbox declarations. The read-only probe can find instance-specific owned names, but those names still do not establish a Mutter window association. No new DBusMenu panel integration is claimed by that diagnostic.
+
 Native Wayland support needs appropriate cooperative metadata or a suitable protocol. GnoMenu does not force applications to switch display backends.
