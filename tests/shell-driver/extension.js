@@ -70,6 +70,16 @@ export default class ShellTestDriver extends Extension {
             return found.length === 2 ? found.sort((a, b) => a.get_stable_sequence() - b.get_stable_sequence()) : null;
         }, 'two real Files windows');
         const binding = action => extension._bindings.find(entry => entry.actor._menuLabNode?.action === action);
+        const directory = GLib.path_get_dirname(GLib.getenv('GNOMENU_REPORT'));
+        const capture = async name => {
+            const stream = Gio.File.new_for_path(GLib.build_filenamev([directory, name]))
+                .replace(null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+            try {
+                await new Shell.Screenshot().screenshot(false, stream);
+            } finally {
+                stream.close(null);
+            }
+        };
         const select = async window => {
             Main.activateWindow(window, global.get_current_time());
             await waitFor(() => global.display.focus_window === window &&
@@ -244,7 +254,7 @@ export default class ShellTestDriver extends Extension {
             }
         }
         assert(dialogShown, 'Imported New Folder command must open the actual native dialog');
-        const createdName = 'gnomenu-created-folder';
+        const createdName = 'gnomenu_created_folder';
         for (const character of createdName) {
             const time = GLib.get_monotonic_time();
             keyboard.notify_keyval(time, character.codePointAt(0), Clutter.KeyState.PRESSED);
@@ -262,7 +272,107 @@ export default class ShellTestDriver extends Extension {
         await waitFor(() => firstGroup.get_action_state('show-menubar')?.unpack() === false &&
             binding('win.gnomenu.slot.reload')?.actor.sensitive,
         'captured models and local ownership recover after the native dialog closes');
-        const directory = GLib.path_get_dirname(GLib.getenv('GNOMENU_REPORT'));
+        const tabCommand = name => extension._bindings.find(entry => {
+            const action = entry.actor._menuLabNode?.action;
+            return action?.startsWith('win.gnomenu.tab.') && action.endsWith(`.${name}`);
+        });
+        const waitTabDetails = async predicate => {
+            const until = GLib.get_monotonic_time() + 8000000;
+            let details;
+            while (GLib.get_monotonic_time() < until) {
+                const state = await observe(windows[0]);
+                details = state.tabDetails ?? [];
+                if (predicate(details))
+                    return details;
+            }
+            throw new Error(`Native tab context did not match: ${JSON.stringify(details)}`);
+        };
+        binding('win.new-tab').actor.activate(null);
+        await waitTabs(2);
+        // Navigate the new tab to a distinct directory using native input.
+        await select(windows[0]);
+        const chordTime = GLib.get_monotonic_time();
+        keyboard.notify_keyval(chordTime, Clutter.KEY_Control_L, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(chordTime + 1000, Clutter.KEY_l, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(chordTime + 2000, Clutter.KEY_l, Clutter.KeyState.RELEASED);
+        keyboard.notify_keyval(chordTime + 3000, Clutter.KEY_Control_L, Clutter.KeyState.RELEASED);
+        await waitFor(() => true, 'native location entry receives focus');
+        for (const character of currentDirectory.get_child(createdName).get_path()) {
+            const time = GLib.get_monotonic_time();
+            keyboard.notify_keyval(time, character.codePointAt(0), Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time + 1000, character.codePointAt(0), Clutter.KeyState.RELEASED);
+        }
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Return, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time() + 1000, Clutter.KEY_Return, Clutter.KeyState.RELEASED);
+        await waitFor(() => windows[0].title === createdName && tabCommand('tab-move-left')?.actor.sensitive &&
+            extension._buttons.some(button => button.get_first_child().text === createdName),
+            'native tab model follows the newly navigated tab');
+        await waitTabDetails(tabs => tabs.length === 2 && tabs[1].name === createdName);
+        tabCommand('tab-move-left').actor.activate(null);
+        await waitFor(() => tabCommand('tab-move-right')?.actor.sensitive &&
+            !tabCommand('tab-move-left')?.actor.sensitive, 'native tab boundary availability updates');
+        assert(windows[0].title === createdName, 'Moving a tab must retain its active native directory');
+        tabCommand('tab-move-right').actor.activate(null);
+        const tabEvidence = await waitTabDetails(tabs => tabs.length === 2 &&
+            tabs[1].name === createdName);
+        passed.push('Original tab-menu labels and commands move the actual selected tab and track boundary availability');
+        const inactive = tabEvidence[0];
+        assert(inactive.width > 0 && inactive.height > 0, 'Native inactive tab must expose a real pointer target');
+        // GTK's Wayland AT-SPI backend reports zero screen origins and no
+        // selected state for these tabs. Their order/names are observable;
+        // use the private compositor's known narrow layout for pointer input.
+        const tabFrame = windows[0].get_frame_rect();
+        windows[0].move_resize_frame(false, tabFrame.x, tabFrame.y, 520, tabFrame.height);
+        await waitFor(() => Math.abs(windows[0].get_frame_rect().width - 520) < 20,
+            'private narrow tab-bar layout');
+        await capture('native-tabs-before-context.png');
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), tabFrame.x + 130, tabFrame.y + 62);
+        pointer.notify_button(GLib.get_monotonic_time(), Clutter.BUTTON_SECONDARY, Clutter.ButtonState.PRESSED);
+        pointer.notify_button(GLib.get_monotonic_time() + 1000, Clutter.BUTTON_SECONDARY, Clutter.ButtonState.RELEASED);
+        await waitFor(() => {
+            const command = tabCommand('close-current-view');
+            return command && extension._buttons.some(button => button.get_first_child().text === inactive.name &&
+                button.menu.actor.contains(command.actor));
+        }, 'native right-click retains the inactive tab as the exported menu context');
+        let stableNativeContext = 0;
+        await waitFor(() => {
+            stableNativeContext = firstGroup.get_action_enabled('tab-move-left') ? 0 : stableNativeContext + 1;
+            return stableNativeContext >= 7;
+        }, 'scanning preserves native boundary availability while the local context popup is open');
+        assert(windows[0].title === createdName, 'Right-click must not select the inactive tab');
+        // Closing the local popup must not turn its target into the active tab.
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Escape, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time() + 1000, Clutter.KEY_Escape, Clutter.KeyState.RELEASED);
+        await waitFor(() => tabCommand('close-current-view')?.actor.sensitive, 'captured inactive-tab command survives popup close');
+        const contextMenu = extension._buttons.find(button =>
+            button.menu.actor.contains(tabCommand('close-current-view').actor)).menu;
+        contextMenu.open(0);
+        GLib.file_set_contents(GLib.build_filenamev([directory, 'native-tabs-model.json']), JSON.stringify({
+            activeDirectory: windows[0].title,
+            targetTabTitle: inactive.name,
+            windowPath: extension._source.descriptor.windowPath,
+            busOwner: extension._source.descriptor.busName,
+            observedTabs: tabEvidence,
+            actions: extension._bindings.filter(entry =>
+                entry.actor._menuLabNode?.action?.startsWith('win.gnomenu.tab.')).map(entry => ({
+                label: entry.actor.label?.text, action: entry.actor._menuLabNode.action,
+                enabled: entry.actor._menuLabNode.enabled,
+            })),
+        }, null, 2));
+        await capture('native-tabs.png');
+        contextMenu.close(0);
+        const inactiveClose = tabCommand('close-current-view').actor._menuLabNode.action.slice(4);
+        tabCommand('close-current-view').actor.activate(null);
+        await waitTabs(1);
+        assert(windows[0].title === createdName, 'Close Tab must close the clicked inactive tab, preserving the active one');
+        await waitFor(() => !firstGroup.has_action(inactiveClose) && !tabCommand('close-current-view'),
+            'closed tab action aliases and menu are withdrawn');
+        firstGroup.activate_action(inactiveClose, null);
+        const afterRetiredAlias = await observe(windows[0]);
+        assert(afterRetiredAlias.found && windows[0].title === createdName,
+            'A retired alias must not close a replacement tab');
+        passed.push('Right-clicked inactive tab remains the command target after popup close; retired aliases are withdrawn');
+        windows[0].move_resize_frame(false, tabFrame.x, tabFrame.y, tabFrame.width, tabFrame.height);
         GLib.file_set_contents(GLib.build_filenamev([directory, 'native-model.json']), JSON.stringify({
             headings: extension._buttons.map(button => button.get_first_child().text),
             menuPath: extension._source.descriptor.menuPath,
@@ -271,16 +381,8 @@ export default class ShellTestDriver extends Extension {
             actions: extension._bindings.map(entry => ({label: entry.actor.label?.text,
                 action: entry.actor._menuLabNode.action, target: entry.actor._menuLabNode.target?.print(true) ?? null})),
             visibleFileEvidence: visible,
+            tabEvidence,
         }, null, 2));
-        const capture = async name => {
-            const stream = Gio.File.new_for_path(GLib.build_filenamev([directory, name]))
-                .replace(null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
-            try {
-                await new Shell.Screenshot().screenshot(false, stream);
-            } finally {
-                stream.close(null);
-            }
-        };
         const menuFor = action => extension._buttons.find(button => button.menu.actor.contains(binding(action).actor)).menu;
         menuFor('win.gnomenu.view.show-hidden-files').open(0);
         await capture('native-menu.png');

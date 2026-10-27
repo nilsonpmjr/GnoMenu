@@ -35,6 +35,7 @@ lists = []
 tabs = []
 names = set()
 dialogs = []
+tab_details = []
 visited = 0
 
 
@@ -57,6 +58,12 @@ def walk(node, depth=0):
                     if (child := node.get_child_at_index(i)) is not None]
         if role == Atspi.Role.PAGE_TAB:
             tabs.append(node.get_name())
+            if os.environ.get('GNOMENU_OBSERVE_FILES') == '1' and node.get_state_set().contains(Atspi.StateType.SHOWING):
+                rectangle = node.get_component_iface().get_extents(Atspi.CoordType.SCREEN)
+                tab_details.append({'name': node.get_name(),
+                                    'selected': node.get_state_set().contains(Atspi.StateType.SELECTED),
+                                    'x': rectangle.x, 'y': rectangle.y,
+                                    'width': rectangle.width, 'height': rectangle.height})
         if role == Atspi.Role.PAGE_TAB_LIST:
             count = sum(child.get_role() == Atspi.Role.PAGE_TAB for child in children)
             lists.append(count)
@@ -68,4 +75,5 @@ def walk(node, depth=0):
 
 walk(found)
 print(json.dumps({'found': True, 'frames': frames, 'visibleTabEntries': max([len(tabs), *lists]),
-                  'tabLists': lists, 'tabs': tabs, 'names': sorted(names), 'dialogs': dialogs}, ensure_ascii=False))
+                  'tabLists': lists, 'tabs': tabs, 'names': sorted(names), 'dialogs': dialogs,
+                  'tabDetails': tab_details}, ensure_ascii=False))

@@ -20,7 +20,7 @@ Original menu models supply the labels, order, sections, nesting and typed targe
 
 The Nautilus/Ptyxis adapters remain a partial presentation of known commands, not a reconstruction of their complete local menu hierarchy. Complete import needs an application/toolkit exporter that publishes the real menu model and the corresponding actions. Menu layouts cannot be recovered reliably from a GAction inventory alone.
 
-An optional [native Nautilus exporter experiment](native-exporter.md) now captures the real Main Menu, View Options and Current Folder Menu with their widget actions. It is verified in a private harness with two windows and two locales; it is outside the extension ZIP and does not change the default integration described above. Selection, tab and breadcrumb context menus and regular-desktop deployment remain pending.
+An optional [native Nautilus exporter experiment](native-exporter.md) now captures the real Main Menu, View Options, Current Folder Menu and tab context model with their actions. Tab commands retain the selected or right-clicked page as their target. It is verified in a private harness with two windows and two locales; it is outside the extension ZIP and does not change the default integration described above. Selection and breadcrumb context menus, additional tab operations and regular-desktop deployment remain pending.
 
 Selection commands, copy/paste and other internal commands may remain available only in the applications themselves. These require further application/exporter integration; enumeration cannot expose actions the application keeps private.
 

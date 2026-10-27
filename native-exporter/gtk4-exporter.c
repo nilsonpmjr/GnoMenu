@@ -16,6 +16,8 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(GActionGroup, g_object_unref)
 
 typedef struct {
     GWeakRef origin;
+    GWeakRef tab_view;
+    GWeakRef tab_page;
     char *original;
     GSimpleAction *action;
     guint seen;
@@ -37,7 +39,74 @@ typedef struct {
     guint menu_kinds;
     guint issues;
     guint remaining;
+    GtkWidget *copying_tab_view;
+    GObject *copying_tab_page;
+    guint copying_tab_token;
 } WindowExport;
+
+typedef struct {
+    GWeakRef page;
+    gboolean local_open;
+    gboolean preparing;
+} TabContext;
+
+static guint next_tab_token;
+
+static void tab_context_free(gpointer data)
+{
+    TabContext *context = data;
+    g_weak_ref_clear(&context->page);
+    g_free(context);
+}
+
+static void tab_setup_menu(GObject *view, GObject *page, gpointer data)
+{
+    (void)view;
+    TabContext *context = data;
+    if (context->preparing)
+        return;
+    context->local_open = page != NULL;
+    // Keep the clicked page after GTK closes its popup to focus the panel.
+    if (page)
+        g_weak_ref_set(&context->page, page);
+}
+
+static void tab_selection_changed(GObject *view, GParamSpec *spec, gpointer data)
+{
+    (void)view;
+    (void)spec;
+    g_weak_ref_set(&((TabContext *)data)->page, NULL);
+    ((TabContext *)data)->local_open = FALSE;
+}
+
+static gboolean tab_contains(GtkWidget *view, GObject *page)
+{
+    g_autoptr(GListModel) pages = NULL;
+    g_object_get(view, "pages", &pages, NULL);
+    for (guint i = 0; pages && i < g_list_model_get_n_items(pages); i++) {
+        g_autoptr(GObject) candidate = g_list_model_get_item(pages, i);
+        if (candidate == page)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static void tab_prepare(GtkWidget *view, GObject *page)
+{
+    TabContext *context = g_object_get_data(G_OBJECT(view), "gnomenu-tab-context");
+    if (context)
+        context->preparing = TRUE;
+    g_signal_emit_by_name(view, "setup-menu", page);
+    if (context)
+        context->preparing = FALSE;
+}
+
+static void tab_restore(GtkWidget *view)
+{
+    TabContext *context = g_object_get_data(G_OBJECT(view), "gnomenu-tab-context");
+    g_autoptr(GObject) page = context && context->local_open ? g_weak_ref_get(&context->page) : NULL;
+    tab_prepare(view, page && tab_contains(view, page) ? page : NULL);
+}
 
 static GtkWindow *published_window;
 static char *published_signature;
@@ -92,6 +161,9 @@ static GActionGroup *resolve_group(GtkWidget *origin, const char *full, const ch
     g_autofree char *prefix = g_strndup(full, dot - full);
     *name = dot + 1;
     for (GtkWidget *widget = origin; widget; widget = gtk_widget_get_parent(widget)) {
+        if (g_str_equal(prefix, "win") && GTK_IS_APPLICATION_WINDOW(widget) &&
+            g_action_group_has_action(G_ACTION_GROUP(widget), *name))
+            return g_object_ref(G_ACTION_GROUP(widget));
         GHashTable *groups = g_object_get_data(G_OBJECT(widget), GROUPS_KEY);
         GActionGroup *group = groups ? g_hash_table_lookup(groups, prefix) : NULL;
         if (group && g_action_group_has_action(group, *name))
@@ -104,15 +176,22 @@ static void proxy_activate(GSimpleAction *action, GVariant *target, gpointer dat
 {
     Proxy *proxy = data;
     g_autoptr(GtkWidget) origin = g_weak_ref_get(&proxy->origin);
+    g_autoptr(GtkWidget) tab_view = g_weak_ref_get(&proxy->tab_view);
+    g_autoptr(GObject) tab_page = g_weak_ref_get(&proxy->tab_page);
+    if (g_str_has_prefix(g_action_get_name(G_ACTION(action)), "gnomenu.tab.") &&
+        (!tab_view || !tab_page || !tab_contains(tab_view, tab_page)))
+        return;
+    if (tab_view)
+        tab_prepare(tab_view, tab_page);
     const char *name = NULL;
     g_autoptr(GActionGroup) group = origin ? resolve_group(origin, proxy->original, &name) : NULL;
-    if (!group || !g_action_group_get_action_enabled(group, name))
-        return;
-    const GVariantType *type = g_action_group_get_action_parameter_type(group, name);
-    if ((type && (!target || !g_variant_is_of_type(target, type))) || (!type && target))
-        return;
-    (void)action;
-    g_action_group_activate_action(group, name, target);
+    if (group && g_action_group_get_action_enabled(group, name)) {
+        const GVariantType *type = g_action_group_get_action_parameter_type(group, name);
+        if ((type && target && g_variant_is_of_type(target, type)) || (!type && !target))
+            g_action_group_activate_action(group, name, target);
+    }
+    if (tab_view)
+        tab_restore(tab_view);
 }
 
 static void proxy_change(GSimpleAction *action, GVariant *state, gpointer data)
@@ -134,6 +213,8 @@ static void proxy_free(gpointer data)
     g_signal_handlers_disconnect_by_data(proxy->action, proxy);
     g_object_unref(proxy->action);
     g_weak_ref_clear(&proxy->origin);
+    g_weak_ref_clear(&proxy->tab_view);
+    g_weak_ref_clear(&proxy->tab_page);
     g_free(proxy->original);
     g_free(proxy);
 }
@@ -190,7 +271,8 @@ static void remember_button(WindowExport *export, GtkWidget *widget)
 
 static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *origin, const char *full)
 {
-    if (!strchr(full, '.') || g_str_has_prefix(full, "app.") || g_str_has_prefix(full, "win."))
+    gboolean tab_action = export->copying_tab_page && g_str_has_prefix(full, "win.");
+    if (!strchr(full, '.') || g_str_has_prefix(full, "app.") || (g_str_has_prefix(full, "win.") && !tab_action))
         return g_strdup(full);
     const char *name = NULL;
     g_autoptr(GActionGroup) group = resolve_group(origin, full, &name);
@@ -200,7 +282,8 @@ static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *orig
             g_printerr("GNOMENU_UNRESOLVED action=%s origin=%s\n", full, G_OBJECT_TYPE_NAME(origin));
         return g_strdup(full);
     }
-    g_autofree char *local = g_strconcat("gnomenu.", full, NULL);
+    g_autofree char *local = tab_action ? g_strdup_printf("gnomenu.tab.%u.%s", export->copying_tab_token, name) :
+        g_strconcat("gnomenu.", full, NULL);
     Proxy *proxy = g_hash_table_lookup(export->proxies, local);
     const GVariantType *parameter = g_action_group_get_action_parameter_type(group, name);
     g_autoptr(GVariant) state = g_action_group_get_action_state(group, name);
@@ -221,6 +304,8 @@ static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *orig
     if (!proxy) {
         proxy = g_new0(Proxy, 1);
         g_weak_ref_init(&proxy->origin, origin);
+        g_weak_ref_init(&proxy->tab_view, tab_action ? export->copying_tab_view : NULL);
+        g_weak_ref_init(&proxy->tab_page, tab_action ? export->copying_tab_page : NULL);
         proxy->original = g_strdup(full);
         proxy->action = state ? g_simple_action_new_stateful(local, parameter, state) :
             g_simple_action_new(local, parameter);
@@ -339,6 +424,54 @@ static gboolean has_action(GMenuModel *model, const char *action, guint depth)
     return FALSE;
 }
 
+static void collect_tab_menu(WindowExport *export, GtkWidget *window, GtkWidget *view,
+                             GMenu *root, GString *signature)
+{
+    gint count = 0;
+    g_autoptr(GMenuModel) model = NULL;
+    g_autoptr(GObject) selected = NULL;
+    g_object_get(view, "n-pages", &count, "menu-model", &model, "selected-page", &selected, NULL);
+    TabContext *context = g_object_get_data(G_OBJECT(view), "gnomenu-tab-context");
+    if (!context) {
+        context = g_new0(TabContext, 1);
+        g_weak_ref_init(&context->page, NULL);
+        g_object_set_data_full(G_OBJECT(view), "gnomenu-tab-context", context, tab_context_free);
+        g_signal_connect(view, "setup-menu", G_CALLBACK(tab_setup_menu), context);
+        g_signal_connect(view, "notify::selected-page", G_CALLBACK(tab_selection_changed), context);
+    }
+    if (count < 2 || !model || !has_action(model, "win.close-current-view", 0))
+        return;
+    g_autoptr(GObject) page = g_weak_ref_get(&context->page);
+    if (!page || !tab_contains(view, page))
+        g_set_object(&page, selected);
+    if (!page)
+        return;
+    g_autofree char *title = NULL;
+    g_object_get(page, "title", &title, NULL);
+    if (!title || !*title)
+        return;
+    guint token = GPOINTER_TO_UINT(g_object_get_data(page, "gnomenu-tab-token"));
+    if (!token) {
+        token = ++next_tab_token;
+        g_object_set_data(page, "gnomenu-tab-token", GUINT_TO_POINTER(token));
+    }
+    export->copying_tab_view = view;
+    export->copying_tab_page = page;
+    export->copying_tab_token = token;
+    // Let Nautilus calculate availability for this exact page, just as it does
+    // before displaying its local context menu. Restore its normal state after.
+    tab_prepare(view, page);
+    g_string_append_printf(signature, "tab=%u/%s;", token, title);
+    g_autoptr(GMenu) copy = copy_menu(export, window, view, NULL, model, signature, 0);
+    tab_restore(view);
+    export->copying_tab_view = NULL;
+    export->copying_tab_page = NULL;
+    // GMenu labels use mnemonic underscores; tab titles are literal filenames.
+    g_auto(GStrv) title_parts = g_strsplit(title, "_", -1);
+    g_autofree char *menu_title = g_strjoinv("__", title_parts);
+    g_menu_append_submenu(root, menu_title, G_MENU_MODEL(copy));
+}
+
 static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *widget,
                           GMenu *root, GString *signature, guint depth)
 {
@@ -348,6 +481,8 @@ static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *wi
     // Its generated buttons are consumers, never additional native sources.
     if (GTK_IS_POPOVER_MENU_BAR(widget))
         return;
+    if (g_str_equal(G_OBJECT_TYPE_NAME(widget), "AdwTabView"))
+        collect_tab_menu(export, window, widget, root, signature);
     gboolean captured = FALSE;
     for (guint i = 0; i < export->buttons->len; i++) {
         Button *button = g_ptr_array_index(export->buttons, i);

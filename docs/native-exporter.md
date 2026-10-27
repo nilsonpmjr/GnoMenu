@@ -1,12 +1,14 @@
 # Experimental Nautilus menu exporter
 
-The optional exporter can import Nautilus 50.4's actual **Main Menu**, **View Options** and **Current Folder Menu** models into GnoMenu. It also exports the widget actions those models reference, including zoom, sorting, Show Hidden Files, folder creation, bookmarks and reload. It does not generate a menu by turning action identifiers into captions.
+The optional exporter can import Nautilus 50.4's actual **Main Menu**, **View Options**, **Current Folder Menu** and **tab context menu** models into GnoMenu. It also exports the widget actions those models reference, including zoom, sorting, Show Hidden Files, folder creation, bookmarks and reload. It does not generate a menu by turning action identifiers into captions.
 
 This is a working experiment for the native RPM application. It is outside the installable extension ZIP and is not enabled by the normal installer. The default Nautilus integration remains the documented partial adapter.
 
 ![Original View Options imported into the panel](images/native-view-options.png)
 
 ![Original Current Folder Menu imported into the panel](images/native-current-folder.png)
+
+![Original tab context menu retains the inactive tab as its target](images/native-tabs.png)
 
 ## Reproduce
 
@@ -51,6 +53,16 @@ The second iteration handles the header and bottom-bar instances of View Options
 
 The third iteration adds the pathbar's Current Folder Menu. Its caption is the native button tooltip, and its `slot.*` actions are forwarded alongside `view.*` actions into the exact window. Nautilus continues to populate its templates, extension sections and action availability. Add/Remove from Bookmarks follows the native state of the current directory, including after switching windows. This is the existing folder-menu model, not a merger of selection or breadcrumb menus.
 
+## Tab context
+
+With at least two tabs, the exporter also reads the actual `AdwTabView` menu model through its public GObject properties. Its panel heading is the target page's real title, with literal underscores escaped for GMenu mnemonic handling. It adds no generic commands category or synthesized action captions.
+
+The default target is the selected page. Nautilus's native `setup-menu` signal supplies the clicked page when the user opens a tab context menu, including an inactive page. The exporter keeps a weak reference to that page after the local popup closes; selecting another tab clears this retained context.
+
+Each page gets distinct forwarding action names, such as `win.gnomenu.tab.8.close-current-view`. Before activation, the exporter verifies that the page still belongs to the same tab view. It asks Nautilus to prepare the menu for that exact page, checks the original action's current availability and parameter type, invokes it, then restores the previous native menu context. Internal preparation does not replace the remembered user context. If a local popup is still open, scanning preserves that popup's original target and availability. Dead pages lose their aliases on the next scan. A closed page's alias cannot be reassigned to a new page.
+
+The native tab strip and its right-click popup remain available. This iteration does not suppress tab context popups or hide navigation controls. The three captured toolbar menus retain their separate hiding/restoration lifecycle.
+
 ## Local controls
 
 When all three supported menus have resolved their actions and custom slots, the library exposes a boolean `win.show-menubar` action. GnoMenu's existing capture lifecycle uses it to hide the original menu buttons, including a responsive duplicate when present. The original visibility flags are restored when capture ends or the extension is disabled. Other toolbar controls and uncaptured context menus remain available.
@@ -63,7 +75,7 @@ If a supported model disappears or cannot resolve its actions, the exporter rest
 
 Observed environment: Nautilus `50.4-1.fc44`, GTK `4.22.5-2.fc44`, GNOME Shell `50.6-1.fc44`, Wayland on Bazzite 44.
 
-Eighteen check groups cover the two locale sessions:
+Twenty-two check groups cover the two locale sessions:
 
 - Original Main Menu/View Options/Current Folder Menu models, native custom zoom entries and tuple targets are imported.
 - Show Hidden Files reveals a real hidden test file. Nautilus intentionally shares this preference across its windows; the exporter preserves that behavior.
@@ -73,7 +85,11 @@ Eighteen check groups cover the two locale sessions:
 - Native keyboard shortcuts switch between list and grid views. The imported menu follows the native Visible Columns/Captions availability, and hidden-file commands continue to work.
 - Add/Remove from Bookmarks changes the native bookmark file under the private XDG config directory. Switching windows preserves the other directory's independent bookmark availability.
 - New Folder opens Nautilus's native dialog. Virtual keyboard input completes creation, and the resulting directory exists only under the selected test window's folder. Capture recovers after the dialog closes.
+- Tab menu commands move the active page left and right, with availability following the native boundary conditions. The active directory remains selected. The menu heading preserves literal underscores in the tab title.
+- A real pointer right-click targets an inactive tab. After the native popup closes, the panel's Close Tab command closes that page and preserves the active directory. Its aliases are removed, and replaying a retired alias leaves the remaining window intact.
 - Original local menu controls return when focus changes to the other window and when GnoMenu is disabled.
+
+On this GTK Wayland build, AT-SPI reports zero screen origins and false selected flags for the native tab objects, and accessible child enumeration does not track visual reordering. The test uses native action availability and the actual window title for movement/selection checks. Pointer input uses the declared private narrow layout, while accessible names and the resulting closed/remaining page establish which tab was targeted. This is not validation of arbitrary themes, scale factors or tab-strip layouts.
 
 The regular 101 check groups also passed without loading the optional library. The extension ZIP includes the Shell actor-lifetime cleanup fix; the native library remains outside the ZIP and normal installation.
 
@@ -84,6 +100,8 @@ Local artifacts:
 - `reports/dev-session/real-apps/native-exporter/native-menu.png`: imported View Options.
 - `reports/dev-session/real-apps/native-exporter/native-main-menu.png`: imported Main Menu.
 - `reports/dev-session/real-apps/native-exporter/native-current-folder.png`: imported Current Folder Menu.
+- `reports/dev-session/real-apps/native-exporter/native-tabs.png`: imported context of a right-clicked inactive tab.
+- `reports/dev-session/real-apps/native-exporter/native-tabs-model.json`: observed active directory, target title, tab action aliases/availability and exact window owner/path at capture time.
 - `reports/dev-session/real-apps/native-exporter/native-controls-restored.png`: controls after disable.
 - `reports/rea-native-exporter.json`: retained REA controlled-replay evidence.
 
@@ -93,7 +111,8 @@ REA static evidence: `ev_2820ecf786e0d1826f0ea9d3cda77d7eeb00642a5503f44e5962495
 
 ## Remaining work
 
-- Capture tab, individual breadcrumb, background right-click and selection context menus with their real context and action targets. The pathbar's separate Current Folder Menu is already captured.
+- Capture individual breadcrumb, background right-click and selection context menus with their real context and action targets. The pathbar's separate Current Folder Menu and the tab model are already captured.
+- Validate tab detachment, restoring closed tabs, closing other tabs, page transfer, keyboard context requests and repeated focus changes while a tab menu is open.
 - Extend the bounded tab, view-mode and responsive-layout checks to navigation, background/foreground transitions and long-running stress.
 - Exercise parameter/state type replacement with dedicated changing-type fixtures; the replacement guard is implemented but the real-app checks do not force Nautilus to change an action's type.
 - Harden model lifetimes and live replacement beyond the validated cases, including disappearance of entire supported menus.

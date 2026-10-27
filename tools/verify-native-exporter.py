@@ -36,12 +36,14 @@ report = {
     'versions': subprocess.check_output(['rpm', '-q', 'nautilus', 'gtk4', 'gnome-shell'], text=True).splitlines(),
     'cases': cases,
     'limits': [
-        'Only the actual Main Menu, View Options and Current Folder Menu models of Nautilus 50.4 are captured.',
-        'Selection, breadcrumb, tab and background right-click menus, generic widget-class actions, long-running stress and Flatpak loading are not validated.',
+        'Actual Main Menu, View Options, Current Folder Menu and tab context models of Nautilus 50.4 are captured.',
+        'Selection, breadcrumb and background right-click menus, generic widget-class actions, long-running stress and Flatpak loading are not validated.',
         'Tab cycles, narrow/wide resizing and grid/list changes cover the declared Nautilus version only.',
         'The optional library is loaded into test Nautilus processes only; it is outside the extension ZIP.',
         'Show Hidden Files preserves the native shared preference; sort targets are checked on two separate windows.',
         'Folder creation and bookmark operations are checked against the private test filesystem, not the regular desktop.',
+        'Tab checks cover native movement and inactive-tab close after right-click; detach, restore and close-other-tabs remain unverified.',
+        'Tab pointer input uses the declared private narrow layout; GTK Wayland AT-SPI tab screen origins/selected flags are unreliable in this build.',
     ],
 }
 output = root / 'reports/native-exporter.json'
