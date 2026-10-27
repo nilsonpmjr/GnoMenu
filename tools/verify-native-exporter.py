@@ -32,11 +32,15 @@ report = {
     'timestamp_utc': datetime.now(timezone.utc).isoformat(),
     'library_sha256': hashlib.sha256(library.read_bytes()).hexdigest(),
     'source_sha256': hashlib.sha256((root / 'native-exporter/gtk4-exporter.c').read_bytes()).hexdigest(),
+    'extension_sources_sha256': {name: hashlib.sha256((root / 'extension' / name).read_bytes()).hexdigest()
+                                 for name in ['metadata.json', 'extension.js', 'gmenuSource.js', 'actionMenus.js']},
+    'driver_sha256': hashlib.sha256((root / 'tests/shell-driver/extension.js').read_bytes()).hexdigest(),
     'nautilus_sha256': hashlib.sha256(Path('/usr/bin/nautilus').read_bytes()).hexdigest(),
     'versions': subprocess.check_output(['rpm', '-q', 'nautilus', 'gtk4', 'gnome-shell'], text=True).splitlines(),
     'cases': cases,
     'limits': [
         'Actual toolbar, tab, clicked breadcrumb, file-selection and background context models of Nautilus 50.4 are captured.',
+        'The marked Nautilus presentation keeps app-name/File/Edit/View/Go/Help and distributes imported commands while retaining their captured targets.',
         'Generic widget-class actions, long-running stress, trash/deletion, arbitrary extension menus and Flatpak loading are not validated.',
         'Tab cycles, narrow/wide resizing and grid/list changes cover the declared Nautilus version only.',
         'The optional library is loaded into test Nautilus processes only; it is outside the extension ZIP.',

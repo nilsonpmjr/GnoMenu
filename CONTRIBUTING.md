@@ -31,6 +31,7 @@ The Shell tests run private compositors. Their configuration, session bus and ap
 - Pin unique owners and exact window/action paths. Invalidate old sources immediately when the target changes.
 - Preserve exported labels and action parameters. Translate only GnoMenu-owned text.
 - Import menu layout from its actual model. Action identifiers do not establish captions or placement; do not synthesize catch-all menus from action inventories.
+- The explicit Nautilus presentation keeps File/Edit/View/Go/Help and places imported native entries in those categories. Keep the original command labels, targets and context guards; test deduplication and stable headings when changing that policy. Other applications retain their own native layout.
 - Present action-based adapters as partial support. Do not advertise a complete native menu without evidence.
 - Do not match windows by application title or PID.
 - Keep research and test dependencies outside the installed ZIP.

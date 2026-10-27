@@ -2,7 +2,7 @@
 // Copyright (C) 2026 GnoMenu contributors
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
-import {actionMenus} from './actionMenus.js';
+import {actionMenus, organizeFilesMenus} from './actionMenus.js';
 
 const MAX_ITEMS = 512;
 const MAX_DEPTH = 12;
@@ -112,6 +112,7 @@ export class GMenuSource {
                     id: `${path}/${i}`,
                     label: text('label'),
                     action: text('action'),
+                    layout: text('x-gnomenu-layout'),
                     target: attr('target'),
                     kind: submenu ? 'submenu' : section ? 'section' : 'item',
                     children: [],
@@ -131,6 +132,13 @@ export class GMenuSource {
         };
         this._applicationMenu = this._appModel ? read(this._appModel, 'app', 0, new Set()) : [];
         this._snapshot = this._model ? read(this._model, 'root', 0, new Set()) : [];
+        if (this.descriptor.applicationId === 'org.gnome.Nautilus' &&
+            this._snapshot.some(node => node.layout === 'files')) {
+            const organized = organizeFilesMenus(this._snapshot, this._applicationMenu,
+                this._resolve.bind(this), this._gettext);
+            this._snapshot = organized.tree;
+            this._applicationMenu = organized.applicationMenu;
+        }
         const actions = new Set();
         const collect = nodes => {
             for (const node of nodes) {
@@ -168,6 +176,23 @@ export class GMenuSource {
         if (!this._model)
             this._snapshot = actionMenus(this.descriptor.applicationId,
                 this._resolve.bind(this), this._gettext);
+        // Presentation adds headings and supported fallback actions. Apply the
+        // same total bound to the final tree, including those extra nodes.
+        let budget = MAX_ITEMS;
+        const bound = (nodes, depth = 0) => {
+            const kept = [];
+            for (const node of nodes) {
+                if (depth > MAX_DEPTH || budget-- <= 0) {
+                    this.truncated = true;
+                    break;
+                }
+                node.children = bound(node.children, depth + 1);
+                kept.push(node);
+            }
+            return kept;
+        };
+        this._applicationMenu = bound(this._applicationMenu);
+        this._snapshot = bound(this._snapshot);
         this.partial = !this._model && (!this._appModel || this._snapshot.length > 0);
         const index = nodes => {
             for (const node of nodes) {

@@ -13,6 +13,11 @@ root = Path(__file__).resolve().parent.parent
 (root / 'reports').mkdir(exist_ok=True)
 os.environ['GIO_USE_VFS'] = 'local'
 results = {}
+layout = subprocess.run(['gjs', '-m', str(root / 'tests/files-layout.js')],
+                        capture_output=True, text=True, check=True)
+print(layout.stdout, end='', flush=True)
+results['files_layout'] = {'success': True,
+                           'passed': [line[6:] for line in layout.stdout.splitlines() if line.startswith('PASS: ')]}
 
 
 def ready(process, name):

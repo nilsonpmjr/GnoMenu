@@ -224,6 +224,14 @@ export default class GnoMenu extends Extension {
         if (index === 0)
             button.add_style_class_name('gnomenu-application-button');
         button.add_child(new St.Label({text, y_align: Clutter.ActorAlign.CENTER}));
+        // PanelMenu constrains the popup to the monitor work area. Give its
+        // content a scrollable allocation so imported commands remain reachable.
+        button.menu._boxPointer.bin.set_child(null);
+        button.menu._boxPointer.bin.set_child(new St.ScrollView({
+            hscrollbar_policy: St.PolicyType.NEVER,
+            vscrollbar_policy: St.PolicyType.AUTOMATIC,
+            child: button.menu.box,
+        }));
         button.menu.connect('open-state-changed', (_menu, open) => {
             if (!open)
                 this._queueFocus();

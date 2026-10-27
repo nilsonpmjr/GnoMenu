@@ -70,6 +70,13 @@ export default class ShellTestDriver extends Extension {
             return found.length === 2 ? found.sort((a, b) => a.get_stable_sequence() - b.get_stable_sequence()) : null;
         }, 'two real Files windows');
         const binding = action => extension._bindings.find(entry => entry.actor._menuLabNode?.action === action);
+        const contextMatches = (entry, name) => entry?.actor._menuLabNode.contextLabel?.replace(/__/g, '_') === name;
+        const assertFilesHeadings = () => assert(JSON.stringify(extension._buttons.slice(1)
+            .map(button => button.get_first_child().text)) === JSON.stringify(
+            ['File', 'Edit', 'View', 'Go', 'Help'].map(text => extension.gettext(text))),
+        'Files must keep File/Edit/View/Go/Help in the session language');
+        const inCategory = (entry, name) => entry && extension._buttons.some(button =>
+            button.get_first_child().text === extension.gettext(name) && button.menu.actor.contains(entry.actor));
         const directory = GLib.path_get_dirname(GLib.getenv('GNOMENU_REPORT'));
         const capture = async name => {
             const stream = Gio.File.new_for_path(GLib.build_filenamev([directory, name]))
@@ -111,10 +118,15 @@ export default class ShellTestDriver extends Extension {
             throw new Error(`Actual hidden-file visibility did not become ${visible}`);
         };
         await select(windows[0]);
-        await waitFor(() => binding('win.gnomenu.slot.reload')?.actor.sensitive && extension._buttons.length === 4,
+        await waitFor(() => binding('win.gnomenu.slot.reload')?.actor.sensitive && extension._buttons.length === 6,
             'native current-folder model and its slot actions are imported');
         assert(!extension._source.partial,
-            'Bridge must import the three actual menu models, without synthetic categories');
+            'Native import must retain complete capture while using the Files presentation');
+        assertFilesHeadings();
+        assert(inCategory(binding('win.gnomenu.view.sort'), 'View') &&
+            inCategory(binding('win.gnomenu.slot.reload'), 'Go') &&
+            extension._buttons[0].menu.actor.contains(binding('app.preferences').actor),
+        'Native actions must be added to their intended categories and app settings');
         assert(binding('win.gnomenu.view.zoom-in') && binding('win.gnomenu.view.sort') &&
             binding('win.gnomenu.view.show-hidden-files'), 'Native custom zoom, typed sort and hidden-file commands must exist');
         const firstGroup = extension._source._groups.get('win');
@@ -185,7 +197,7 @@ export default class ShellTestDriver extends Extension {
             await waitHidden(windows[0], true);
             binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
             await waitHidden(windows[0], false);
-            assert(extension._buttons.length === 4, 'Responsive layout must not duplicate imported menus');
+            assertFilesHeadings();
         }
         passed.push('Narrow and wide Files layouts retain working imported commands without duplicate menus');
         const keyboard = global.stage.context.get_backend().get_default_seat()
@@ -305,7 +317,7 @@ export default class ShellTestDriver extends Extension {
         keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Return, Clutter.KeyState.PRESSED);
         keyboard.notify_keyval(GLib.get_monotonic_time() + 1000, Clutter.KEY_Return, Clutter.KeyState.RELEASED);
         await waitFor(() => windows[0].title === createdName && tabCommand('tab-move-left')?.actor.sensitive &&
-            extension._buttons.some(button => button.get_first_child().text === createdName),
+            contextMatches(tabCommand('tab-move-left'), createdName),
             'native tab model follows the newly navigated tab');
         await waitTabDetails(tabs => tabs.length === 2 && tabs[1].name === createdName);
         tabCommand('tab-move-left').actor.activate(null);
@@ -331,8 +343,7 @@ export default class ShellTestDriver extends Extension {
         pointer.notify_button(GLib.get_monotonic_time() + 1000, Clutter.BUTTON_SECONDARY, Clutter.ButtonState.RELEASED);
         await waitFor(() => {
             const command = tabCommand('close-current-view');
-            return command && extension._buttons.some(button => button.get_first_child().text === inactive.name &&
-                button.menu.actor.contains(command.actor));
+            return contextMatches(command, inactive.name);
         }, 'native right-click retains the inactive tab as the exported menu context');
         let stableNativeContext = 0;
         await waitFor(() => {
@@ -405,8 +416,7 @@ export default class ShellTestDriver extends Extension {
         // These pointer offsets are specific to this private 1100px GTK layout.
         await rightClickPath(640);
         await waitFor(() => breadcrumbCommand('open-item-new-tab')?.actor.sensitive &&
-            extension._buttons.some(button => button.get_first_child().text === currentDirectory.get_basename() &&
-                button.menu.actor.contains(breadcrumbCommand('open-item-new-tab').actor)),
+            contextMatches(breadcrumbCommand('open-item-new-tab'), currentDirectory.get_basename()),
         'actual parent breadcrumb context is captured with its native folder title');
         await dismissBreadcrumbPopup();
         const breadcrumbMenu = extension._buttons.find(button =>
@@ -435,8 +445,7 @@ export default class ShellTestDriver extends Extension {
         await observe(windows[0]);
         await waitFor(() => breadcrumbCommand('open-item-new-tab')?.actor.sensitive &&
             breadcrumbCommand('open-item-new-tab').actor._menuLabNode.action.slice(4) !== oldBreadcrumbAlias &&
-            extension._buttons.some(button => button.get_first_child().text === workspaceName &&
-                button.menu.actor.contains(breadcrumbCommand('open-item-new-tab').actor)),
+            contextMatches(breadcrumbCommand('open-item-new-tab'), workspaceName),
         'a new ancestor click replaces the breadcrumb action context');
         await dismissBreadcrumbPopup();
         await waitFor(() => !firstGroup.has_action(oldBreadcrumbAlias), 'previous breadcrumb aliases are retired');
@@ -497,7 +506,7 @@ export default class ShellTestDriver extends Extension {
             'Select All changes selection and invalidates the previous background capture');
         await clickContent(114, Clutter.BUTTON_SECONDARY);
         await waitFor(() => fileCommand('open-item-new-tab')?.actor.sensitive && fileCommand('copy')?.actor.sensitive &&
-            extension._buttons.some(button => names.every(name => button.get_first_child().text.includes(name))),
+            names.every(name => fileCommand('copy').actor._menuLabNode.contextLabel?.includes(name)),
         'native multi-selection popup retains both actual file names');
         // Escape dismisses the native popup without clearing selected rows.
         escape();
@@ -512,9 +521,11 @@ export default class ShellTestDriver extends Extension {
         await clickContent(114);
         await clickContent(114, Clutter.BUTTON_SECONDARY);
         await waitFor(() => fileCommand('open-item-new-tab')?.actor.sensitive &&
-            extension._buttons.some(button => button.get_first_child().text === names[0] &&
-                button.menu.actor.contains(fileCommand('open-item-new-tab').actor)),
+            contextMatches(fileCommand('open-item-new-tab'), names[0]),
         'single-file context imports the first row with its native name');
+        assertFilesHeadings();
+        assert(inCategory(fileCommand('copy'), 'Edit') && inCategory(fileCommand('cut'), 'Edit') &&
+            inCategory(fileCommand('rename'), 'File'), 'Imported selection commands must enter Edit and File');
         escape();
         await observe(windows[0]);
         const selectionAlias = fileCommand('open-item-new-tab').actor._menuLabNode.action.slice(4);
@@ -522,6 +533,20 @@ export default class ShellTestDriver extends Extension {
             button.menu.actor.contains(fileCommand('open-item-new-tab').actor)).menu;
         selectionMenu.open(0);
         await capture('native-selection.png');
+        const scroll = selectionMenu._boxPointer.bin.get_child();
+        const adjustment = scroll.get_vadjustment();
+        const workArea = Main.layoutManager.getWorkAreaForMonitor(Main.layoutManager.primaryIndex);
+        assert(selectionMenu.actor.height <= workArea.height,
+            'Long File menu must fit inside the monitor work area');
+        assert(adjustment.upper > adjustment.page_size, 'Long File menu must offer scrolling');
+        adjustment.value = adjustment.upper - adjustment.page_size;
+        await waitFor(() => adjustment.value > 0, 'Last imported commands can be scrolled into view');
+        await capture('native-selection-scrolled.png');
+        adjustment.value = 0;
+        selectionMenu.close(0);
+        extension._buttons[2].menu.open(0);
+        await capture('native-edit.png');
+        extension._buttons[2].menu.close(0);
         GLib.file_set_contents(GLib.build_filenamev([directory, 'native-selection-model.json']), JSON.stringify({
             windowPath: extension._source.descriptor.windowPath,
             busOwner: extension._source.descriptor.busName,
@@ -553,8 +578,7 @@ export default class ShellTestDriver extends Extension {
         assert(afterSelectionChange.visibleTabEntries <= 1, 'A stale file command must not act on the replacement selection');
         await clickContent(166, Clutter.BUTTON_SECONDARY);
         await waitFor(() => fileCommand('open-item-new-tab')?.actor.sensitive &&
-            extension._buttons.some(button => button.get_first_child().text === names[1] &&
-                button.menu.actor.contains(fileCommand('open-item-new-tab').actor)),
+            contextMatches(fileCommand('open-item-new-tab'), names[1]),
         'new selection receives its own native context and aliases');
         escape();
         await observe(windows[0]);
@@ -576,8 +600,7 @@ export default class ShellTestDriver extends Extension {
             await dismissThroughSidebar();
             await clickContent(offset);
             await clickContent(offset, Clutter.BUTTON_SECONDARY);
-            await waitFor(() => fileCommand(action)?.actor.sensitive && extension._buttons.some(button =>
-                button.get_first_child().text === name && button.menu.actor.contains(fileCommand(action).actor)),
+            await waitFor(() => fileCommand(action)?.actor.sensitive && contextMatches(fileCommand(action), name),
             'native context matches the requested temporary folder');
             escape();
             await observe(windows[0]);
@@ -677,6 +700,8 @@ export default class ShellTestDriver extends Extension {
         GLib.file_set_contents(GLib.build_filenamev([directory, 'native-clipboard.json']),
             JSON.stringify(clipboardEvidence, null, 2));
         passed.push('Captured Rename opens the native entry, preserves file contents and retires the original name context');
+        assertFilesHeadings();
+        passed.push('Imported commands keep the fixed Files categories through native context and filename changes');
         GLib.file_set_contents(GLib.build_filenamev([directory, 'native-model.json']), JSON.stringify({
             headings: extension._buttons.map(button => button.get_first_child().text),
             menuPath: extension._source.descriptor.menuPath,

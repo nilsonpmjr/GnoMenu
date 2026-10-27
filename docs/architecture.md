@@ -22,6 +22,8 @@ There is no Python helper, network client, telemetry or clipboard integration in
 
 Native menu models retain their labels, order, sections, nesting and typed targets. Conventional application actions provide translated fallback labels when no equivalent native action is present. `actionMenus.js` supplies explicit partial Nautilus/Ptyxis mappings. Other action identifiers do not become menu items: an action group does not encode menu placement or user-facing captions.
 
+The owned Nautilus exporter marks its top-level models with `x-gnomenu-layout=files`. For those models, `organizeFilesMenus()` applies the requested stable app-name/File/Edit/View/Go/Help presentation. It splits original sections by explicit category, retains nested menu labels and targets, puts settings/about/quit under the app name, and merges supported fallback commands without duplicate canonical actions/typed targets. Context-scoped native actions win over their general counterparts, and their source context remains attached to the displayed nodes. Other applications are not regrouped. The final tree is bounded after presentation as well as during import.
+
 ## Lifetimes
 
 The extension maintains up to two window sources: the focused window and the last active Files window. Window sources that are no longer either target are disposed. A persistent `FilesDesktopSource` supplies the same explicit Files adapter when no Files window exists. It watches the published application name without requesting service activation and creates a pinned application-only GMenu source when that name has an owner. Its owner epoch invalidates stale commands across disconnects; launchers remain available without an owner. Window actions are never dispatched from this source.

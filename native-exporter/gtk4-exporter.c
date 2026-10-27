@@ -895,6 +895,7 @@ static gboolean scan(gpointer data)
             g_menu_remove_all(shared_root);
             for (gint item = 0; item < g_menu_model_get_n_items(G_MENU_MODEL(export->model)); item++) {
                 g_autoptr(GMenuItem) copy = g_menu_item_new_from_model(G_MENU_MODEL(export->model), item);
+                g_menu_item_set_attribute(copy, "x-gnomenu-layout", "s", "files");
                 g_menu_append_item(shared_root, copy);
             }
         }

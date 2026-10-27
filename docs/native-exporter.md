@@ -4,17 +4,36 @@ The optional exporter can import Nautilus 50.4's actual **Main Menu**, **View Op
 
 This is a working experiment for the native RPM application. It is outside the installable extension ZIP and is not enabled by the normal installer. The default Nautilus integration remains the documented partial adapter.
 
-![Original View Options imported into the panel](images/native-view-options.png)
+## Files layout
 
-![Original Current Folder Menu imported into the panel](images/native-current-folder.png)
+The panel keeps **Files · File · Edit · View · Go · Help**, matching the established layout. Capturing a window adds its commands to those categories instead of introducing Current Folder Menu, View Options, Main Menu or filename headings in the panel.
 
-![Original tab context menu retains the inactive tab as its target](images/native-tabs.png)
+- The app name contains native preferences, about and quit actions.
+- File contains window/tab operations, opening, folder creation, properties and file operations such as rename.
+- Edit contains undo/redo, cut/copy/paste and selection operations.
+- View contains the established sidebar/transfers actions plus imported zoom, sorting and display options.
+- Go contains the established navigation actions plus reload/bookmarks and the clicked ancestor's named submenu.
+- Help contains native help and keyboard shortcuts.
+
+Imported labels and typed targets are retained. The existing Duplicate Window caption distinguishes cloning the current folder from New Window, which opens Home. Repeated commands are merged by their underlying action and target, preferring a captured selection/tab context over a general fallback. Supported existing commands keep their familiar place. Nested native menus remain nested within the appropriate category; unrecognized imported entries retain their captions under File. Other applications' native layouts are unaffected. Long dropdowns scroll within the monitor work area so added commands remain accessible.
+
+This presentation requires the current extension and exporter. Close and reopen the private demo after updating them.
+
+![Imported display options under View](images/native-view-options.png)
+
+![Imported navigation options under Go](images/native-current-folder.png)
+
+![Tab commands under File retain the inactive tab as their target](images/native-tabs.png)
 
 ![Original breadcrumb menu targets the clicked parent folder](images/native-breadcrumbs.png)
 
-![Original single-selection menu targets the selected folder](images/native-selection.png)
+![Selected-folder operations under File](images/native-selection.png)
 
-![Original background menu imported into the panel](images/native-background.png)
+![Scrolling reaches the remaining imported File operations](images/native-selection-scrolled.png)
+
+![Captured clipboard commands under Edit](images/native-edit.png)
+
+![Background selection and clipboard options under Edit](images/native-background.png)
 
 ![Captured Rename opens Nautilus's native filename entry](images/native-rename.png)
 
@@ -51,7 +70,7 @@ The harness creates a private bus, compositor, settings and temporary folders. I
 
 1. The library observes the public `gtk_widget_insert_action_group()` calls and records their original widget and namespace. No private GTK struct offsets are used.
 2. During application startup, it installs a stable GMenu container before windows publish their GTK D-Bus metadata. An existing application menubar is left to its original exporter.
-3. It locates the three supported native menu models on their real menu buttons. Root captions come from the native tooltips. Item labels, sections, targets and nesting come from the original GMenu models. The native zoom custom slots use their actual buttons' tooltips and actions.
+3. It locates the three supported native menu models on their real menu buttons. Source captions come from the native tooltips. Item labels, sections, targets and nesting come from the original GMenu models. The native zoom custom slots use their actual buttons' tooltips and actions. A model marker selects the fixed Files presentation in the extension.
 4. Widget actions get forwarding aliases in the corresponding `GtkApplicationWindow` action map. For example, `view.sort` becomes `win.gnomenu.view.sort`; its original `(sb)` target and state are retained. Invocation resolves the current original group inside that same window, validates the parameter and checks its enabled state.
 5. The ordinary GnoMenu GMenu importer reads the standard GTK menu path and exact window action path. No title/PID matching or new Shell-side protocol is required.
 
@@ -63,7 +82,7 @@ The third iteration adds the pathbar's Current Folder Menu. Its caption is the n
 
 ## Tab context
 
-With at least two tabs, the exporter also reads the actual `AdwTabView` menu model through its public GObject properties. Its panel heading is the target page's real title, with literal underscores escaped for GMenu mnemonic handling. It adds no generic commands category or synthesized action captions.
+With at least two tabs, the exporter also reads the actual `AdwTabView` menu model through its public GObject properties. Its exported context label is the target page's real title, with literal underscores escaped for GMenu mnemonic handling. The extension retains that identity on the commands and places them under File and Go. It adds no generic commands category or synthesized action captions.
 
 The default target is the selected page. Nautilus's native `setup-menu` signal supplies the clicked page when the user opens a tab context menu, including an inactive page. The exporter keeps a weak reference to that page after the local popup closes; selecting another tab clears this retained context.
 
@@ -73,7 +92,7 @@ The native tab strip and its right-click popup remain available. This iteration 
 
 ## Breadcrumb context
 
-The fifth iteration captures the original three-item menu of a clicked ancestor in the pathbar. Nautilus keeps the target file privately, so the exporter observes its public `gtk_popover_set_pointing_to()` and `gtk_popover_popup()` calls. The pointing rectangle identifies the actual breadcrumb button through public widget bounds. The native popup request indicates that Nautilus has prepared its file metadata. The panel heading comes from that button's real tooltip, with literal underscores escaped for GMenu labels.
+The fifth iteration captures the original three-item menu of a clicked ancestor in the pathbar. Nautilus keeps the target file privately, so the exporter observes its public `gtk_popover_set_pointing_to()` and `gtk_popover_popup()` calls. The pointing rectangle identifies the actual breadcrumb button through public widget bounds. The native popup request indicates that Nautilus has prepared its file metadata. The exported label comes from that button's real tooltip, with literal underscores escaped for GMenu labels; the extension keeps it as a named submenu inside Go.
 
 The exporter does not read Nautilus's private structures or reconstruct folder paths from captions. It forwards the original `pathbar.*` actions only while the captured button remains mapped under its original pathbar and the popup's context generation still matches. Each new pointing request immediately invalidates the previous generation, before Nautilus changes its target or waits for metadata. Commands become available for the new generation only after its popup request. Aliases include the generation, for example `win.gnomenu.pathbar.2.open-item-new-tab`.
 
@@ -85,7 +104,7 @@ The sixth iteration captures the actual selection/background models when Nautilu
 
 Each popup gets a new action namespace, such as `win.gnomenu.files.4.view.open-item-new-tab`. The capture holds the selected file objects and location, and refers weakly to the native view/popup. Invocation checks the current location, loading state, exact ordered selection and current popup identity before reaching the original action group. Effective changes retire the capture; selecting the same files again does not revive a retired generation. Redundant notifications that leave the full context unchanged do not retire it. A new popup request replaces the previous context.
 
-Selection headings use the native display names, joined with commas for multiple files; background headings use the actual native window title. Literal underscores remain literal. The current limit is 128 selected objects; larger selections are left to the local menu. Commands, sections, submenus, parameters and availability come from the original GMenu/GAction models, including the original rules for hiding unavailable commands. No commands category is inferred from identifiers.
+Selection context labels use the native display names, joined with commas for multiple files; background labels use the actual native window title. They are retained as command context metadata while the panel headings stay fixed. Literal underscores remain literal. The current limit is 128 selected objects; larger selections are left to the local menu. Command labels, nested menus, parameters and availability come from the original GMenu/GAction models, including the original rules for hiding unavailable commands. The explicit Files presentation determines their category.
 
 The native context popups remain available. Capture requires a native popup request, and a changed context requires reopening it. This establishes the model families, not full validation of every command, file type or extension-provided menu.
 
@@ -103,7 +122,7 @@ If a supported model disappears or cannot resolve its actions, the exporter rest
 
 Observed environment: Nautilus `50.4-1.fc44`, GTK `4.22.5-2.fc44`, GNOME Shell `50.6-1.fc44`, Wayland on Bazzite 44.
 
-Thirty-eight check groups cover the two locale sessions:
+Forty check groups cover the two locale sessions, alongside four focused layout checks:
 
 - Original Main Menu/View Options/Current Folder Menu models, native custom zoom entries and tuple targets are imported.
 - Show Hidden Files reveals a real hidden test file. Nautilus intentionally shares this preference across its windows; the exporter preserves that behavior.
@@ -113,7 +132,7 @@ Thirty-eight check groups cover the two locale sessions:
 - Native keyboard shortcuts switch between list and grid views. The imported menu follows the native Visible Columns/Captions availability, and hidden-file commands continue to work.
 - Add/Remove from Bookmarks changes the native bookmark file under the private XDG config directory. Switching windows preserves the other directory's independent bookmark availability.
 - New Folder opens Nautilus's native dialog. Virtual keyboard input completes creation, and the resulting directory exists only under the selected test window's folder. Capture recovers after the dialog closes.
-- Tab menu commands move the active page left and right, with availability following the native boundary conditions. The active directory remains selected. The menu heading preserves literal underscores in the tab title.
+- Tab menu commands move the active page left and right, with availability following the native boundary conditions. The active directory remains selected, and captured context identity preserves literal underscores in the tab title.
 - A real pointer right-click targets an inactive tab. After the native popup closes, the panel's Close Tab command closes that page and preserves the active directory. Its aliases are removed, and replaying a retired alias leaves the remaining window intact.
 - A real pointer right-click targets the parent breadcrumb while a child folder remains active. The imported Open in New Tab command creates a real background tab for that parent and preserves the active child directory.
 - Clicking the workspace ancestor replaces the breadcrumb context. The previous aliases disappear; replaying one does not open a tab for the new target. The new command opens the workspace in a background tab.
@@ -123,6 +142,7 @@ Thirty-eight check groups cover the two locale sessions:
 - Captured Copy and native Paste copy a selected temporary folder to the other Files window. Exact marker contents are checked, the source remains intact and the unselected folder is absent from the destination.
 - Captured Cut and native Paste move a different selected folder to the other window. Exact contents arrive, the source disappears and the old selection aliases are retired.
 - Captured Rename opens Nautilus's real filename entry. Native keyboard input renames a temporary folder without changing its contents or independent copy. Old name aliases disappear, replay does not reopen a rename entry, and a new popup uses the renamed folder's caption and fresh aliases.
+- Fixed Files headings remain in the session language through selection, tab, breadcrumb and filename changes. Captured sorting and clipboard commands appear in View/Edit, navigation in Go, file operations in File, and settings under the app name.
 - Original local menu controls return when focus changes to the other window and when GnoMenu is disabled.
 
 On this GTK Wayland build, AT-SPI reports zero screen origins and false selected flags for the native tab objects, and accessible child enumeration does not track visual reordering. The test uses native action availability and the actual window title for movement/selection checks. Pointer input uses the declared private narrow layout, while accessible names and the resulting closed/remaining page establish which tab was targeted. This is not validation of arbitrary themes, scale factors or tab-strip layouts.
@@ -131,22 +151,24 @@ Breadcrumb pointer checks use a fixed 1100px layout in the same private composit
 
 File-context pointer input uses the same fixed width in list mode, with two temporary test folders. Tab names/count establish open-command targets; marker contents and source/destination existence establish clipboard and rename effects. Clipboard operations stay on the private Wayland compositor. Tests do not exercise deletion, trash, other clipboard formats, batch rename, external application launching, large selections, arbitrary extension menus or the full range of file types and races.
 
-The regular 101 check groups also passed without loading the optional library. The extension ZIP includes the Shell actor-lifetime cleanup fix; the native library remains outside the ZIP and normal installation.
+The regular verifier also covers the layout checks without loading the optional library. The extension ZIP includes the presentation policy; the native library remains outside the ZIP and normal installation.
 
 Local artifacts:
 
 - `reports/native-exporter.json`: versions, binary/source hashes and both locale results.
 - `reports/dev-session/real-apps/native-exporter/native-model.json`: actual headings, commands, typed targets, owner and exact window paths.
 - `reports/dev-session/real-apps/native-exporter/native-menu.png`: imported View Options.
-- `reports/dev-session/real-apps/native-exporter/native-main-menu.png`: imported Main Menu.
-- `reports/dev-session/real-apps/native-exporter/native-current-folder.png`: imported Current Folder Menu.
+- `reports/dev-session/real-apps/native-exporter/native-main-menu.png`: native application commands under the app heading.
+- `reports/dev-session/real-apps/native-exporter/native-current-folder.png`: imported navigation commands under Go.
 - `reports/dev-session/real-apps/native-exporter/native-tabs.png`: imported context of a right-clicked inactive tab.
 - `reports/dev-session/real-apps/native-exporter/native-tabs-model.json`: observed active directory, target title, tab action aliases/availability and exact window owner/path at capture time.
 - `reports/dev-session/real-apps/native-exporter/native-breadcrumbs.png`: imported context of the parent breadcrumb.
 - `reports/dev-session/real-apps/native-exporter/native-breadcrumbs-model.json`: observed active/target directory, original labels, action aliases and exact window owner/path.
-- `reports/dev-session/real-apps/native-exporter/native-selection.png`: original single-selection menu.
+- `reports/dev-session/real-apps/native-exporter/native-selection.png`: captured single-selection operations under File.
+- `reports/dev-session/real-apps/native-exporter/native-selection-scrolled.png`: remaining File commands reached by scrolling.
+- `reports/dev-session/real-apps/native-exporter/native-edit.png`: captured clipboard commands under Edit.
 - `reports/dev-session/real-apps/native-exporter/native-selection-model.json`: native labels/action aliases, target name and exact window owner/path.
-- `reports/dev-session/real-apps/native-exporter/native-background.png`: original background menu.
+- `reports/dev-session/real-apps/native-exporter/native-background.png`: captured background selection commands under Edit.
 - `reports/dev-session/real-apps/native-exporter/native-rename.png`: actual native rename entry before input.
 - `reports/dev-session/real-apps/native-exporter/native-clipboard.json`: observed source/destination contents, copy/move/rename results, window paths and alias-retirement evidence.
 - `reports/dev-session/real-apps/native-exporter/native-controls-restored.png`: controls after disable.
