@@ -35,4 +35,6 @@ PATH=/usr/bin:/bin:$PATH /usr/bin/python3 tools/probe-session.py \
 
 Inspect an explicit exporter or namespace with repeatable `--name`, for example `--name 'org.gnome.Nautilus.*'`. The probe pins unique owners, uses no service activation, invokes no application actions and starts no registrar. Reports omit environment values and filesystem grants. Permission layers remain separate; the tool does not claim an effective-policy calculation or alter a sandbox. Scan errors and bounds remain visible rather than becoming false absence claims.
 
+The D-Bus probe can also run without the GNOME Shell executable installed. Missing optional desktop tools produce a null version and an explicit query error, while interface inspection continues. The protocol integration suite checks this with those tools removed from its search path.
+
 The controlled replay now observes actual Electron registrations and exact native handles on XWayland. It also records absent registrations in a bounded native Wayland case and a checkbox synchronization gap. The next step is a trusted production window-association path, followed by isolated vendor-application/Flatpak checks. Existing user applications should remain untouched. Static menu construction plus a permission grant remains insufficient to enable panel integration or hide a local menu.

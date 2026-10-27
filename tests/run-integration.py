@@ -50,8 +50,11 @@ for transport in ('gmenu', 'dbusmenu', 'registrar', 'discovery'):
         if transport == 'gmenu':
             diagnostic = subprocess.run([sys.executable, str(root / 'tools/probe-session.py'),
                                          '--name', information['owner']], timeout=15,
+                                        env=dict(os.environ, PATH='/gnomenu-probe-no-optional-tools'),
                                         capture_output=True, text=True, check=True)
-            observed = json.loads(diagnostic.stdout)['applications'][0]
+            probe_report = json.loads(diagnostic.stdout)
+            assert probe_report['gnome_shell'] is None and probe_report['gnome_shell_query_error']
+            observed = probe_report['applications'][0]
             assert observed['owner'] == information['owner']
             assert observed['status'] == 'gmenu-interface-observed'
         result = subprocess.run(['gjs', '-m', str(root / f'tests/{transport}-integration.js'),
@@ -64,7 +67,7 @@ for transport in ('gmenu', 'dbusmenu', 'registrar', 'discovery'):
         if result.returncode:
             sys.exit(result.returncode)
         if transport == 'gmenu':
-            message = 'Read-only diagnostic pins the actual exporter and finds its real GMenu interfaces'
+            message = 'Read-only diagnostic finds pinned GMenu exports even when optional desktop tools are absent'
             results[transport]['passed'].append(message)
             print(f'PASS: {message}', flush=True)
     finally:

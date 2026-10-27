@@ -123,11 +123,12 @@ def main():
         except GLib.Error:
             return None
 
+    shell_version, shell_error = capture(['gnome-shell', '--version'])
     report = {
         'timestamp_utc': datetime.now(timezone.utc).isoformat(),
         'session_type': os.environ.get('XDG_SESSION_TYPE'),
-        'gnome_shell': subprocess.run(['gnome-shell', '--version'], capture_output=True,
-                                      text=True, check=False).stdout.strip(),
+        'gnome_shell': shell_version.strip() if shell_version is not None else None,
+        'gnome_shell_query_error': shell_error,
         'registrar_owner': owner('com.canonical.AppMenu.Registrar'),
         'applications': [], 'flatpaks': [],
         'limits': 'Introspection finds exported interfaces only; absence is not proof '
