@@ -39,6 +39,7 @@ These steps prepare a community extension for the catalog. GNOME approval is a s
 - Native exporter follow-up: keep bindings current across tab lifetimes and view changes, deduplicate responsive header/bottom-bar menus and restore controls when capture becomes incomplete.
 - Native tab context menus use the actual page title and preserve the clicked page across popup dismissal. Real-app checks cover movement, inactive-tab close and retired command aliases; detach, restore and close-other-tabs still need validation.
 - Native breadcrumb menus are captured after a real right-click using the original model and folder tooltip. Real-app checks cover opening the clicked parent in a background tab and retiring aliases when another ancestor replaces its context; Properties and New Window still need validation.
+- Native file-selection and background menus are captured after native popup requests. Selection snapshots preserve actual file objects, retire when selection/location/loading changes and ignore redundant notifications. Real-app checks cover Select All, opening one/two selected folders and stale-command retirement; destructive commands and broad file-type coverage remain pending.
 - Export original local menu models and their widget actions from applications that currently keep them private, starting with Nautilus/Ptyxis.
 - Prove the association between DBusMenu registrations and actual Mutter windows.
 - Investigate Signal and Obsidian exporters and Flatpak bus policies.

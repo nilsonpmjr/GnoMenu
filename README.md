@@ -67,7 +67,7 @@ This downloads a matching Fedora RPM, verifies its signature and extracts the vi
 
 ## Experimental Nautilus exporter
 
-An optional [native Nautilus exporter experiment](docs/native-exporter.md) imports its real Main Menu, View Options, Current Folder Menu, tab context menu and clicked breadcrumb menu, including widget actions and local-control restoration. Tab commands retain the clicked page as their target; breadcrumb commands are retired when a new click replaces their context. It runs only through the private test/demo harness and is not included in the extension ZIP or enabled by the installer.
+An optional [native Nautilus exporter experiment](docs/native-exporter.md) imports its real toolbar, tab, breadcrumb, file-selection and background menu models, including widget actions and local-control restoration. Commands retain their native context; changing selection retires commands from the previous snapshot. It runs only through the private test/demo harness and is not included in the extension ZIP or enabled by the installer.
 
 ## Languages
 

@@ -36,8 +36,8 @@ report = {
     'versions': subprocess.check_output(['rpm', '-q', 'nautilus', 'gtk4', 'gnome-shell'], text=True).splitlines(),
     'cases': cases,
     'limits': [
-        'Actual Main Menu, View Options, Current Folder Menu, tab and clicked breadcrumb context models of Nautilus 50.4 are captured.',
-        'Selection and background right-click menus, generic widget-class actions, long-running stress and Flatpak loading are not validated.',
+        'Actual toolbar, tab, clicked breadcrumb, file-selection and background context models of Nautilus 50.4 are captured.',
+        'Generic widget-class actions, long-running stress, destructive file actions, arbitrary extension menus and Flatpak loading are not validated.',
         'Tab cycles, narrow/wide resizing and grid/list changes cover the declared Nautilus version only.',
         'The optional library is loaded into test Nautilus processes only; it is outside the extension ZIP.',
         'Show Hidden Files preserves the native shared preference; sort targets are checked on two separate windows.',
@@ -45,6 +45,8 @@ report = {
         'Tab checks cover native movement and inactive-tab close after right-click; detach, restore and close-other-tabs remain unverified.',
         'Tab pointer input uses the declared private narrow layout; GTK Wayland AT-SPI tab screen origins/selected flags are unreliable in this build.',
         'Breadcrumb checks cover background-tab opening and replacement of a clicked target in the private 1100px layout; New Window, Properties and click-to-retirement races remain unverified.',
+        'File-context checks cover background Select All, opening one/two selected folders and retiring stale selection aliases in a fixed private list layout.',
+        'Selection snapshots use the documented source contract of Nautilus 50.4 GObject properties and are limited to 128 selected objects; other versions and large selections need separate validation.',
     ],
 }
 output = root / 'reports/native-exporter.json'

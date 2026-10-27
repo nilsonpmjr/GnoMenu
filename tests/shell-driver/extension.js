@@ -450,6 +450,117 @@ export default class ShellTestDriver extends Extension {
         firstGroup.activate_action('close-other-tabs', null);
         await waitTabs(1);
         passed.push('Changing breadcrumb targets retires the previous aliases without redirecting stale commands');
+        const contextDirectory = currentDirectory.get_child(createdName);
+        const names = ['gnomenu-context-A', 'gnomenu-context-B'];
+        for (const name of names)
+            contextDirectory.get_child(name).make_directory(null);
+        const fileCommand = name => extension._bindings.find(entry => {
+            const action = entry.actor._menuLabNode?.action;
+            return action?.startsWith('win.gnomenu.files.') && action.endsWith(`.view.${name}`);
+        });
+        const clickContent = async (offsetY, button = Clutter.BUTTON_PRIMARY) => {
+            const frame = windows[0].get_frame_rect();
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), frame.x + 350, frame.y + offsetY);
+            pointer.notify_button(GLib.get_monotonic_time(), button, Clutter.ButtonState.PRESSED);
+            pointer.notify_button(GLib.get_monotonic_time() + 1000, button, Clutter.ButtonState.RELEASED);
+            await observe(windows[0]);
+        };
+        await select(windows[0]);
+        await clickContent(350);
+        const listTime = GLib.get_monotonic_time();
+        keyboard.notify_keyval(listTime, Clutter.KEY_Control_L, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(listTime + 1000, Clutter.KEY_1, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(listTime + 2000, Clutter.KEY_1, Clutter.KeyState.RELEASED);
+        keyboard.notify_keyval(listTime + 3000, Clutter.KEY_Control_L, Clutter.KeyState.RELEASED);
+        await waitFor(() => binding('win.gnomenu.view.visible-columns')?.actor.sensitive,
+            'native list layout for private file context input');
+        await capture('native-file-context-before.png');
+        await clickContent(350, Clutter.BUTTON_SECONDARY);
+        await capture('native-background-attempt.png');
+        await waitFor(() => fileCommand('select-all')?.actor.sensitive && !fileCommand('copy'),
+            'original background model imports with background-only commands');
+        const backgroundAlias = fileCommand('select-all').actor._menuLabNode.action.slice(4);
+        // The background can be dismissed with an outside click before selecting.
+        await dismissBreadcrumbPopup();
+        await waitFor(() => fileCommand('select-all')?.actor.sensitive,
+            'unchanged background capture survives dismissal');
+        const backgroundMenu = extension._buttons.find(button =>
+            button.menu.actor.contains(fileCommand('select-all').actor)).menu;
+        backgroundMenu.open(0);
+        await capture('native-background.png');
+        backgroundMenu.close(0);
+        fileCommand('select-all').actor.activate(null);
+        await waitFor(() => !firstGroup.has_action(backgroundAlias),
+            'Select All changes selection and invalidates the previous background capture');
+        await clickContent(114, Clutter.BUTTON_SECONDARY);
+        await waitFor(() => fileCommand('open-item-new-tab')?.actor.sensitive && fileCommand('copy')?.actor.sensitive &&
+            extension._buttons.some(button => names.every(name => button.get_first_child().text.includes(name))),
+        'native multi-selection popup retains both actual file names');
+        // Escape dismisses the native popup without clearing selected rows.
+        escape();
+        await observe(windows[0]);
+        fileCommand('open-item-new-tab').actor.activate(null);
+        await waitTabs(3);
+        await waitTabDetails(tabs => names.every(name => tabs.some(tab => tab.name === name)));
+        assert(windows[0].title === createdName, 'Opening selected folders must preserve the active directory');
+        firstGroup.activate_action('close-other-tabs', null);
+        await waitTabs(1);
+        passed.push('Original background Select All reaches the native view and multi-selection commands open both actual folders');
+        await clickContent(114);
+        await clickContent(114, Clutter.BUTTON_SECONDARY);
+        await waitFor(() => fileCommand('open-item-new-tab')?.actor.sensitive &&
+            extension._buttons.some(button => button.get_first_child().text === names[0] &&
+                button.menu.actor.contains(fileCommand('open-item-new-tab').actor)),
+        'single-file context imports the first row with its native name');
+        escape();
+        await observe(windows[0]);
+        const selectionAlias = fileCommand('open-item-new-tab').actor._menuLabNode.action.slice(4);
+        const selectionMenu = extension._buttons.find(button =>
+            button.menu.actor.contains(fileCommand('open-item-new-tab').actor)).menu;
+        selectionMenu.open(0);
+        await capture('native-selection.png');
+        GLib.file_set_contents(GLib.build_filenamev([directory, 'native-selection-model.json']), JSON.stringify({
+            windowPath: extension._source.descriptor.windowPath,
+            busOwner: extension._source.descriptor.busName,
+            target: names[0],
+            actions: extension._bindings.filter(entry =>
+                entry.actor._menuLabNode?.action?.startsWith('win.gnomenu.files.')).map(entry => ({
+                label: entry.actor.label?.text, action: entry.actor._menuLabNode.action,
+            })),
+        }, null, 2));
+        selectionMenu.close(0);
+        fileCommand('open-item-new-tab').actor.activate(null);
+        await waitTabs(2);
+        await waitTabDetails(tabs => tabs.some(tab => tab.name === names[0]) && !tabs.some(tab => tab.name === names[1]));
+        firstGroup.activate_action('close-other-tabs', null);
+        await waitTabs(1);
+        passed.push('Original single-selection menu opens only the captured folder in a real background tab');
+        // Dismiss any grab through the blank sidebar, preserving selection A
+        // before a real click replaces it with selection B.
+        const selectionFrame = windows[0].get_frame_rect();
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), selectionFrame.x + 80, selectionFrame.y + 350);
+        pointer.notify_button(GLib.get_monotonic_time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+        pointer.notify_button(GLib.get_monotonic_time() + 1000, Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+        await observe(windows[0]);
+        assert(firstGroup.has_action(selectionAlias), 'Unchanged selection retains its captured aliases');
+        await clickContent(166);
+        await waitFor(() => !firstGroup.has_action(selectionAlias), 'selection changes retire the original aliases');
+        firstGroup.activate_action(selectionAlias, null);
+        const afterSelectionChange = await observe(windows[0]);
+        assert(afterSelectionChange.visibleTabEntries <= 1, 'A stale file command must not act on the replacement selection');
+        await clickContent(166, Clutter.BUTTON_SECONDARY);
+        await waitFor(() => fileCommand('open-item-new-tab')?.actor.sensitive &&
+            extension._buttons.some(button => button.get_first_child().text === names[1] &&
+                button.menu.actor.contains(fileCommand('open-item-new-tab').actor)),
+        'new selection receives its own native context and aliases');
+        escape();
+        await observe(windows[0]);
+        fileCommand('open-item-new-tab').actor.activate(null);
+        await waitTabs(2);
+        await waitTabDetails(tabs => tabs.some(tab => tab.name === names[1]) && !tabs.some(tab => tab.name === names[0]));
+        firstGroup.activate_action('close-other-tabs', null);
+        await waitTabs(1);
+        passed.push('Changing native selection withdraws stale commands without redirecting them to a different folder');
         GLib.file_set_contents(GLib.build_filenamev([directory, 'native-model.json']), JSON.stringify({
             headings: extension._buttons.map(button => button.get_first_child().text),
             menuPath: extension._source.descriptor.menuPath,

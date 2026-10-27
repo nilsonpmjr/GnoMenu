@@ -14,6 +14,24 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(GActionGroup, g_object_unref)
 #define FOLDER_MENU 4u
 #define REQUIRED_MENUS (MAIN_MENU | VIEW_MENU | FOLDER_MENU)
 #define BREADCRUMB_KEY "gnomenu-breadcrumb-context"
+#define FILE_VIEW_KEY "gnomenu-file-view-context"
+#define FILE_POPUP_KEY "gnomenu-file-popup-context"
+
+typedef struct {
+    guint epoch;
+    GWeakRef popup;
+} FileViewContext;
+
+typedef struct {
+    GWeakRef view;
+    guint epoch;
+    guint token;
+    GFile *location;
+    GList *selection;
+    char *title;
+} FilePopupContext;
+
+static gboolean file_popup_valid(GtkPopover *popover, guint token);
 
 typedef struct {
     GWeakRef button;
@@ -27,6 +45,8 @@ typedef struct {
     GWeakRef tab_page;
     GWeakRef breadcrumb;
     guint breadcrumb_token;
+    GWeakRef file_popup;
+    guint file_popup_token;
     char *original;
     GSimpleAction *action;
     guint seen;
@@ -53,6 +73,8 @@ typedef struct {
     guint copying_tab_token;
     GtkPopover *copying_breadcrumb;
     guint copying_breadcrumb_token;
+    GtkPopover *copying_file_popup;
+    guint copying_file_token;
 } WindowExport;
 
 typedef struct {
@@ -63,6 +85,7 @@ typedef struct {
 
 static guint next_tab_token;
 static guint next_breadcrumb_token;
+static guint next_file_token;
 
 static gboolean breadcrumb_valid(GtkPopover *popover, guint token)
 {
@@ -185,6 +208,11 @@ static GActionGroup *resolve_group(GtkWidget *origin, const char *full, const ch
         if (g_str_equal(prefix, "win") && GTK_IS_APPLICATION_WINDOW(widget) &&
             g_action_group_has_action(G_ACTION_GROUP(widget), *name))
             return g_object_ref(G_ACTION_GROUP(widget));
+        if (g_str_equal(prefix, "app") && GTK_IS_APPLICATION_WINDOW(widget)) {
+            GtkApplication *app = gtk_window_get_application(GTK_WINDOW(widget));
+            if (app && g_action_group_has_action(G_ACTION_GROUP(app), *name))
+                return g_object_ref(G_ACTION_GROUP(app));
+        }
         GHashTable *groups = g_object_get_data(G_OBJECT(widget), GROUPS_KEY);
         GActionGroup *group = groups ? g_hash_table_lookup(groups, prefix) : NULL;
         if (group && g_action_group_has_action(group, *name))
@@ -200,6 +228,9 @@ static void proxy_activate(GSimpleAction *action, GVariant *target, gpointer dat
     g_autoptr(GtkWidget) tab_view = g_weak_ref_get(&proxy->tab_view);
     g_autoptr(GObject) tab_page = g_weak_ref_get(&proxy->tab_page);
     g_autoptr(GtkPopover) breadcrumb = g_weak_ref_get(&proxy->breadcrumb);
+    g_autoptr(GtkPopover) file_popup = g_weak_ref_get(&proxy->file_popup);
+    if (proxy->file_popup_token && (!file_popup || !file_popup_valid(file_popup, proxy->file_popup_token)))
+        return;
     if (proxy->breadcrumb_token && (!breadcrumb || !breadcrumb_valid(breadcrumb, proxy->breadcrumb_token)))
         return;
     if (g_str_has_prefix(g_action_get_name(G_ACTION(action)), "gnomenu.tab.") &&
@@ -221,6 +252,9 @@ static void proxy_activate(GSimpleAction *action, GVariant *target, gpointer dat
 static void proxy_change(GSimpleAction *action, GVariant *state, gpointer data)
 {
     Proxy *proxy = data;
+    g_autoptr(GtkPopover) file_popup = g_weak_ref_get(&proxy->file_popup);
+    if (proxy->file_popup_token && (!file_popup || !file_popup_valid(file_popup, proxy->file_popup_token)))
+        return;
     g_autoptr(GtkWidget) origin = g_weak_ref_get(&proxy->origin);
     const char *name = NULL;
     g_autoptr(GActionGroup) group = origin ? resolve_group(origin, proxy->original, &name) : NULL;
@@ -240,6 +274,7 @@ static void proxy_free(gpointer data)
     g_weak_ref_clear(&proxy->tab_view);
     g_weak_ref_clear(&proxy->tab_page);
     g_weak_ref_clear(&proxy->breadcrumb);
+    g_weak_ref_clear(&proxy->file_popup);
     g_free(proxy->original);
     g_free(proxy);
 }
@@ -297,7 +332,8 @@ static void remember_button(WindowExport *export, GtkWidget *widget)
 static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *origin, const char *full)
 {
     gboolean tab_action = export->copying_tab_page && g_str_has_prefix(full, "win.");
-    if (!strchr(full, '.') || g_str_has_prefix(full, "app.") || (g_str_has_prefix(full, "win.") && !tab_action))
+    if (!strchr(full, '.') || (!export->copying_file_popup &&
+        (g_str_has_prefix(full, "app.") || (g_str_has_prefix(full, "win.") && !tab_action))))
         return g_strdup(full);
     const char *name = NULL;
     g_autoptr(GActionGroup) group = resolve_group(origin, full, &name);
@@ -310,6 +346,7 @@ static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *orig
     gboolean breadcrumb_action = export->copying_breadcrumb && g_str_has_prefix(full, "pathbar.");
     g_autofree char *local = tab_action ? g_strdup_printf("gnomenu.tab.%u.%s", export->copying_tab_token, name) :
         breadcrumb_action ? g_strdup_printf("gnomenu.pathbar.%u.%s", export->copying_breadcrumb_token, name) :
+        export->copying_file_popup ? g_strdup_printf("gnomenu.files.%u.%s", export->copying_file_token, full) :
         g_strconcat("gnomenu.", full, NULL);
     Proxy *proxy = g_hash_table_lookup(export->proxies, local);
     const GVariantType *parameter = g_action_group_get_action_parameter_type(group, name);
@@ -335,6 +372,8 @@ static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *orig
         g_weak_ref_init(&proxy->tab_page, tab_action ? export->copying_tab_page : NULL);
         g_weak_ref_init(&proxy->breadcrumb, breadcrumb_action ? export->copying_breadcrumb : NULL);
         proxy->breadcrumb_token = breadcrumb_action ? export->copying_breadcrumb_token : 0;
+        g_weak_ref_init(&proxy->file_popup, export->copying_file_popup);
+        proxy->file_popup_token = export->copying_file_popup ? export->copying_file_token : 0;
         proxy->original = g_strdup(full);
         proxy->action = state ? g_simple_action_new_stateful(local, parameter, state) :
             g_simple_action_new(local, parameter);
@@ -453,6 +492,132 @@ static gboolean has_action(GMenuModel *model, const char *action, guint depth)
     return FALSE;
 }
 
+static void file_view_free(gpointer data)
+{
+    FileViewContext *context = data;
+    g_weak_ref_clear(&context->popup);
+    g_free(context);
+}
+
+static void file_view_changed(GObject *view, GParamSpec *spec, gpointer data)
+{
+    (void)view;
+    (void)spec;
+    FileViewContext *context = data;
+    g_autoptr(GtkPopover) popup = g_weak_ref_get(&context->popup);
+    FilePopupContext *capture = popup ? g_object_get_data(G_OBJECT(popup), FILE_POPUP_KEY) : NULL;
+    // Nautilus can notify selection after opening a popup even when the actual
+    // selection is unchanged. Retire only a genuinely different context.
+    if (!capture || !file_popup_valid(popup, capture->token))
+        context->epoch++;
+}
+
+static FileViewContext *file_view_watch(GtkWidget *view)
+{
+    FileViewContext *context = g_object_get_data(G_OBJECT(view), FILE_VIEW_KEY);
+    if (!context) {
+        context = g_new0(FileViewContext, 1);
+        g_weak_ref_init(&context->popup, NULL);
+        g_object_set_data_full(G_OBJECT(view), FILE_VIEW_KEY, context, file_view_free);
+        g_signal_connect(view, "notify::selection", G_CALLBACK(file_view_changed), context);
+        g_signal_connect(view, "notify::location", G_CALLBACK(file_view_changed), context);
+        g_signal_connect(view, "notify::loading", G_CALLBACK(file_view_changed), context);
+    }
+    return context;
+}
+
+static void file_popup_free(gpointer data)
+{
+    FilePopupContext *capture = data;
+    g_weak_ref_clear(&capture->view);
+    g_clear_object(&capture->location);
+    // Nautilus 50.4's public selection getter transfers a list of GObject refs.
+    g_list_free_full(capture->selection, g_object_unref);
+    g_free(capture->title);
+    g_free(capture);
+}
+
+static gboolean file_popup_valid(GtkPopover *popover, guint token)
+{
+    FilePopupContext *capture = g_object_get_data(G_OBJECT(popover), FILE_POPUP_KEY);
+    g_autoptr(GtkWidget) view = capture ? g_weak_ref_get(&capture->view) : NULL;
+    if (!view || capture->token != token || !gtk_widget_get_mapped(view))
+        return FALSE;
+    FileViewContext *context = g_object_get_data(G_OBJECT(view), FILE_VIEW_KEY);
+    g_autoptr(GtkPopover) current = context ? g_weak_ref_get(&context->popup) : NULL;
+    if (!context || context->epoch != capture->epoch || current != popover)
+        return FALSE;
+    gboolean loading = TRUE;
+    g_autoptr(GFile) location = NULL;
+    GList *selection = NULL;
+    g_object_get(view, "loading", &loading, "location", &location, "selection", &selection, NULL);
+    gboolean valid = !loading && location && capture->location && g_file_equal(location, capture->location);
+    GList *a = selection, *b = capture->selection;
+    while (valid && a && b) {
+        valid = a->data == b->data;
+        a = a->next;
+        b = b->next;
+    }
+    valid = valid && !a && !b;
+    g_list_free_full(selection, g_object_unref);
+    return valid;
+}
+
+static void capture_file_popup(GtkPopover *popover)
+{
+    if (!GTK_IS_POPOVER_MENU(popover))
+        return;
+    GtkWidget *view = gtk_widget_get_parent(GTK_WIDGET(popover));
+    GType view_type = g_type_from_name("NautilusFilesView");
+    GMenuModel *model = gtk_popover_menu_get_menu_model(GTK_POPOVER_MENU(popover));
+    if (!view || !view_type || !g_type_is_a(G_OBJECT_TYPE(view), view_type) || !model ||
+        (!has_action(model, "view.copy", 0) && !has_action(model, "view.new-folder", 0)))
+        return;
+    FileViewContext *context = file_view_watch(view);
+    FilePopupContext *capture = g_new0(FilePopupContext, 1);
+    g_weak_ref_init(&capture->view, view);
+    capture->epoch = context->epoch;
+    capture->token = ++next_file_token;
+    g_object_get(view, "location", &capture->location, "selection", &capture->selection, NULL);
+    if (capture->selection && g_list_length(capture->selection) <= 128) {
+        g_autoptr(GString) title = g_string_new(NULL);
+        for (GList *item = capture->selection; item; item = item->next) {
+            g_autofree char *name = NULL;
+            g_object_get(item->data, "display-name", &name, NULL);
+            if (title->len)
+                g_string_append(title, ", ");
+            g_string_append(title, name ? name : "");
+        }
+        capture->title = g_strdup(title->str);
+    } else if (!capture->selection) {
+        GtkRoot *root = gtk_widget_get_root(view);
+        if (GTK_IS_WINDOW(root))
+            capture->title = g_strdup(gtk_window_get_title(GTK_WINDOW(root)));
+    }
+    g_object_set_data_full(G_OBJECT(popover), FILE_POPUP_KEY, capture, file_popup_free);
+    g_weak_ref_set(&context->popup, popover);
+    g_printerr("GNOMENU_FILE_CAPTURE token=%u epoch=%u selected=%u\n", capture->token, capture->epoch,
+        g_list_length(capture->selection));
+}
+
+static void collect_file_popup(WindowExport *export, GtkWidget *window, GtkPopover *popover,
+                               GMenu *root, GString *signature)
+{
+    FilePopupContext *capture = g_object_get_data(G_OBJECT(popover), FILE_POPUP_KEY);
+    if (!capture || !capture->title || !*capture->title || !file_popup_valid(popover, capture->token))
+        return;
+    g_autoptr(GtkWidget) view = g_weak_ref_get(&capture->view);
+    export->copying_file_popup = popover;
+    export->copying_file_token = capture->token;
+    g_string_append_printf(signature, "files=%u/%s;", capture->token, capture->title);
+    GMenuModel *model = gtk_popover_menu_get_menu_model(GTK_POPOVER_MENU(popover));
+    g_autoptr(GMenu) copy = copy_menu(export, window, view, GTK_WIDGET(popover), model, signature, 0);
+    export->copying_file_popup = NULL;
+    g_auto(GStrv) parts = g_strsplit(capture->title, "_", -1);
+    g_autofree char *caption = g_strjoinv("__", parts);
+    g_menu_append_submenu(root, caption, G_MENU_MODEL(copy));
+}
+
 static gboolean is_breadcrumb_popover(GtkPopover *popover)
 {
     GtkWidget *bar = gtk_widget_get_parent(GTK_WIDGET(popover));
@@ -516,6 +681,8 @@ void gtk_popover_popup(GtkPopover *popover)
     if (!original)
         original = dlsym(RTLD_NEXT, "gtk_popover_popup");
     original(popover);
+    if (enabled)
+        capture_file_popup(popover);
     if (enabled && is_breadcrumb_popover(popover)) {
         BreadcrumbContext *context = g_object_get_data(G_OBJECT(popover), BREADCRUMB_KEY);
         if (context)
@@ -602,6 +769,8 @@ static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *wi
     // Its generated buttons are consumers, never additional native sources.
     if (GTK_IS_POPOVER_MENU_BAR(widget))
         return;
+    if (GTK_IS_POPOVER_MENU(widget))
+        collect_file_popup(export, window, GTK_POPOVER(widget), root, signature);
     if (GTK_IS_POPOVER_MENU(widget) && is_breadcrumb_popover(GTK_POPOVER(widget)))
         collect_breadcrumb_menu(export, window, GTK_POPOVER(widget), root, signature);
     if (g_str_equal(G_OBJECT_TYPE_NAME(widget), "AdwTabView"))
