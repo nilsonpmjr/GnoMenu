@@ -35,6 +35,8 @@ report = {
     'extension_sources_sha256': {name: hashlib.sha256((root / 'extension' / name).read_bytes()).hexdigest()
                                  for name in ['metadata.json', 'extension.js', 'gmenuSource.js', 'actionMenus.js']},
     'driver_sha256': hashlib.sha256((root / 'tests/shell-driver/extension.js').read_bytes()).hexdigest(),
+    'observer_sha256': hashlib.sha256((root / 'tests/observe-real-window.py').read_bytes()).hexdigest(),
+    'runner_sha256': hashlib.sha256((root / 'tests/run-shell.py').read_bytes()).hexdigest(),
     'nautilus_sha256': hashlib.sha256(Path('/usr/bin/nautilus').read_bytes()).hexdigest(),
     'versions': subprocess.check_output(['rpm', '-q', 'nautilus', 'gtk4', 'gnome-shell'], text=True).splitlines(),
     'cases': cases,
@@ -46,7 +48,7 @@ report = {
         'The optional library is loaded into test Nautilus processes only; it is outside the extension ZIP.',
         'Show Hidden Files preserves the native shared preference; sort targets are checked on two separate windows.',
         'Folder creation and bookmark operations are checked against the private test filesystem, not the regular desktop.',
-        'Tab checks cover native movement and inactive-tab close after right-click; detach, restore and close-other-tabs remain unverified.',
+        'Tab checks cover native movement, inactive-tab close/restore, detaching the clicked inactive page, alias retirement and disposal of the transferred window; dedicated contextual close-other-tabs, cross-window drag-and-drop and navigation-history restoration remain unverified.',
         'Tab pointer input uses the declared private narrow layout; GTK Wayland AT-SPI tab screen origins/selected flags are unreliable in this build.',
         'Breadcrumb checks cover background-tab opening and replacement of a clicked target in the private 1100px layout; New Window, Properties and click-to-retirement races remain unverified.',
         'File-context checks cover background Select All, opening one/two selected folders and retiring stale selection aliases in a fixed private list layout.',

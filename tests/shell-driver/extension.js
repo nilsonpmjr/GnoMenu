@@ -410,6 +410,74 @@ export default class ShellTestDriver extends Extension {
         assert(afterRetiredAlias.found && windows[0].title === createdName,
             'A retired alias must not close a replacement tab');
         passed.push('Right-clicked inactive tab remains the command target after popup close; retired aliases are withdrawn');
+        await waitFor(() => binding('win.restore-tab')?.actor.sensitive,
+            'the closed native tab can be reopened through File');
+        binding('win.restore-tab').actor.activate(null);
+        await waitTabs(2);
+        const restoredTabs = await waitTabDetails(tabs => tabs.some(tab => tab.name === inactive.name) &&
+            tabs.some(tab => tab.name === createdName));
+        assert(windows[0].title === createdName, 'Reopening the closed tab must preserve the active child directory');
+        passed.push('Reopen Closed Tab restores the actual closed directory alongside the preserved active native tab');
+        // Restored pages are inserted after the active page in this native
+        // 520px layout; right-click the inactive page without selecting it.
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), tabFrame.x + 390, tabFrame.y + 62);
+        pointer.notify_button(GLib.get_monotonic_time(), Clutter.BUTTON_SECONDARY, Clutter.ButtonState.PRESSED);
+        pointer.notify_button(GLib.get_monotonic_time() + 1000, Clutter.BUTTON_SECONDARY, Clutter.ButtonState.RELEASED);
+        await waitFor(() => contextMatches(tabCommand('tab-move-new-window'), inactive.name),
+            'the restored inactive tab becomes the native detach command target');
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Escape, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time() + 1000, Clutter.KEY_Escape, Clutter.KeyState.RELEASED);
+        await waitFor(() => tabCommand('tab-move-new-window')?.actor.sensitive,
+            'captured detach remains available after dismissing the native popup');
+        const transferAlias = tabCommand('tab-move-new-window').actor._menuLabNode.action.slice(4);
+        const transferCloseAlias = tabCommand('close-current-view').actor._menuLabNode.action.slice(4);
+        const filesWindows = () => global.get_window_actors().map(actor => actor.meta_window)
+            .filter(window => window.get_gtk_application_id() === 'org.gnome.Nautilus');
+        tabCommand('tab-move-new-window').actor.activate(null);
+        const detached = await waitFor(() => filesWindows().find(window => !windows.includes(window) &&
+            window.title === inactive.name), 'the captured inactive tab moves into an actual third Files window');
+        await waitTabs(1);
+        assert(windows[0].title === createdName && filesWindows().length === 3,
+            'Detaching the inactive page must preserve both original Files windows');
+        await waitFor(() => !firstGroup.has_action(transferAlias) && !firstGroup.has_action(transferCloseAlias),
+            'transferred page aliases are retired from the original window');
+        firstGroup.activate_action(transferCloseAlias, null);
+        firstGroup.activate_action(transferAlias, null);
+        await observe(windows[0]);
+        assert(filesWindows().length === 3 && windows[0].title === createdName && detached.title === inactive.name,
+            'Replaying retired aliases cannot move or close the transferred page or its replacement');
+        passed.push('Move Tab to New Window transfers the clicked inactive page and retires its original-window aliases');
+        await select(detached);
+        const detachedSource = extension._source;
+        const detachedPath = detachedSource.descriptor.windowPath;
+        assert(detachedPath !== windows[0].get_gtk_window_object_path() &&
+            detachedPath !== windows[1].get_gtk_window_object_path(), 'The transferred window must have its own GTK action path');
+        const detachedState = await observe(detached);
+        GLib.file_set_contents(GLib.build_filenamev([directory, 'native-tab-transfer-state.json']), JSON.stringify({
+            observed: detachedState, partial: detachedSource.partial,
+            reloadSensitive: binding('win.gnomenu.slot.reload')?.actor.sensitive,
+            descriptor: detachedSource.descriptor,
+        }, null, 2));
+        assert(detachedState.found && detachedState.visibleTabEntries <= 1 && !detachedSource.partial &&
+            binding('win.gnomenu.slot.reload')?.actor.sensitive,
+        'The new window imports its own complete native models and live widget commands');
+        await capture('native-tab-transfer.png');
+        const detachedClose = binding('win.close-current-view').actor._menuLabNode;
+        binding('win.close-current-view').actor.activate(null);
+        await waitFor(() => filesWindows().length === 2 && !filesWindows().includes(detached) && detachedSource.closed,
+            'closing the transferred window disposes its source without closing the other windows');
+        assert(!detachedSource.activate(detachedClose), 'Disposed transferred-window commands cannot dispatch');
+        await select(windows[0]);
+        await waitTabs(1);
+        assert(windows[0].title === createdName && extension._source.descriptor.windowPath === windows[0].get_gtk_window_object_path(),
+            'Returning to the original window must recover its exact command source');
+        GLib.file_set_contents(GLib.build_filenamev([directory, 'native-tab-transfer.json']), JSON.stringify({
+            restoredTabs, target: inactive.name, preserved: windows[0].title,
+            originalPath: windows[0].get_gtk_window_object_path(), detachedPath,
+            retiredAliases: [transferAlias, transferCloseAlias], sourceDisposed: detachedSource.closed,
+            remainingWindowPaths: filesWindows().map(window => window.get_gtk_window_object_path()),
+        }, null, 2));
+        passed.push('Transferred Files window owns a distinct native action path and closing it disposes only its own source');
         windows[0].move_resize_frame(false, tabFrame.x, tabFrame.y, tabFrame.width, tabFrame.height);
         windows[0].move_resize_frame(false, 20, tabFrame.y, 1100, tabFrame.height);
         await waitFor(() => Math.abs(windows[0].get_frame_rect().width - 1100) < 20,

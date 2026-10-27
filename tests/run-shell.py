@@ -190,7 +190,7 @@ def main():
                         return viewer_process.wait(timeout=args.duration)
                     except subprocess.TimeoutExpired:
                         return 0
-                deadline = time.monotonic() + 65
+                deadline = time.monotonic() + (90 if args.native_exporter else 65)
                 while not result_path.exists():
                     if shell.poll() is not None:
                         raise RuntimeError('Shell exited during integration checks')

@@ -90,6 +90,10 @@ Each page gets distinct forwarding action names, such as `win.gnomenu.tab.8.clos
 
 The native tab strip and its right-click popup remain available. This iteration does not suppress tab context popups or hide navigation controls. The three captured toolbar menus retain their separate hiding/restoration lifecycle.
 
+The real-app checks also reopen a closed inactive tab through File, then right-click that restored tab and invoke Move Tab to New Window through Go. Its original directory moves to a third Files window while the active child and the other original window remain. The exporter removes the transferred page's aliases from the original action map. The new window imports native models through its own GTK window path. Closing its last tab disposes only that window's source; commands issued by the disposed source are rejected. This validates the menu command, not drag-and-drop transfer or restoration of a full navigation history.
+
+![A transferred native Files tab imports menus through its own window path](images/native-tab-transfer.png)
+
 ## Breadcrumb context
 
 The fifth iteration captures the original three-item menu of a clicked ancestor in the pathbar. Nautilus keeps the target file privately, so the exporter observes its public `gtk_popover_set_pointing_to()` and `gtk_popover_popup()` calls. The pointing rectangle identifies the actual breadcrumb button through public widget bounds. The native popup request indicates that Nautilus has prepared its file metadata. The exported label comes from that button's real tooltip, with literal underscores escaped for GMenu labels; the extension keeps it as a named submenu inside Go.
@@ -142,7 +146,7 @@ The navigation buttons and their native popups remain available. Capture is on d
 
 Observed environment: Nautilus `50.4-1.fc44`, GTK `4.22.5-2.fc44`, GNOME Shell `50.6-1.fc44`, Wayland on Bazzite 44.
 
-Fifty-four check groups cover the two locale sessions, alongside six focused layout checks and a live D-Bus test of additional menu arrival, typed command dispatch to the exact window, removal and stale-command rejection. Additional native menus are exercised both with controlled models and with Nautilus's real history popups.
+Sixty check groups cover the two locale sessions, alongside six focused layout checks and a live D-Bus test of additional menu arrival, typed command dispatch to the exact window, removal and stale-command rejection. Additional native menus are exercised both with controlled models and with Nautilus's real history popups.
 
 - Original Main Menu/View Options/Current Folder Menu models, native custom zoom entries and tuple targets are imported.
 - Show Hidden Files reveals a real hidden test file. Nautilus intentionally shares this preference across its windows; the exporter preserves that behavior.
@@ -154,6 +158,8 @@ Fifty-four check groups cover the two locale sessions, alongside six focused lay
 - New Folder opens Nautilus's native dialog. Virtual keyboard input completes creation, and the resulting directory exists only under the selected test window's folder. Capture recovers after the dialog closes.
 - Tab menu commands move the active page left and right, with availability following the native boundary conditions. The active directory remains selected, and captured context identity preserves literal underscores in the tab title.
 - A real pointer right-click targets an inactive tab. After the native popup closes, the panel's Close Tab command closes that page and preserves the active directory. Its aliases are removed, and replaying a retired alias leaves the remaining window intact.
+- Reopen Closed Tab restores the actual closed directory alongside the preserved active child. A right-click targets that restored inactive page for Move Tab to New Window; its original aliases retire after transfer and replay cannot close or move a replacement page.
+- The transferred Files window imports complete native models through a distinct GTK action path. Closing it disposes its source, rejects its old commands and preserves both original windows and their locations.
 - A real pointer right-click targets the parent breadcrumb while a child folder remains active. The imported Open in New Tab command creates a real background tab for that parent and preserves the active child directory.
 - Clicking the workspace ancestor replaces the breadcrumb context. The previous aliases disappear; replaying one does not open a tab for the new target. The new command opens the workspace in a background tab.
 - The imported background Select All command selects two real folders. Their native multi-selection menu opens both in actual background tabs, preserving the active directory.
@@ -189,6 +195,9 @@ Local artifacts:
 - `reports/dev-session/real-apps/native-exporter/native-current-folder.png`: imported navigation commands under Go.
 - `reports/dev-session/real-apps/native-exporter/native-tabs.png`: imported context of a right-clicked inactive tab.
 - `reports/dev-session/real-apps/native-exporter/native-tabs-model.json`: observed active directory, target title, tab action aliases/availability and exact window owner/path at capture time.
+- `reports/dev-session/real-apps/native-exporter/native-tab-transfer.png`: the real detached window using its own native menu source.
+- `reports/dev-session/real-apps/native-exporter/native-tab-transfer.json`: reopened tab names, transferred target, preserved directory, exact window paths, retired aliases and source-disposal result.
+- `reports/dev-session/real-apps/native-exporter/native-tab-transfer-state.json`: the detached window's observed tab visibility, source descriptor and native command availability.
 - `reports/dev-session/real-apps/native-exporter/native-breadcrumbs.png`: imported context of the parent breadcrumb.
 - `reports/dev-session/real-apps/native-exporter/native-breadcrumbs-model.json`: observed active/target directory, original labels, action aliases and exact window owner/path.
 - `reports/dev-session/real-apps/native-exporter/native-selection.png`: captured single-selection operations under File.
@@ -213,7 +222,7 @@ REA static evidence: `ev_2820ecf786e0d1826f0ea9d3cda77d7eeb00642a5503f44e5962495
 
 - Validate more file types, clipboard formats, multi-selection cases, extension-provided entries, batch rename and trash/deletion under dedicated temporary fixtures. The main toolbar and context model families are captured; comprehensive command coverage remains pending.
 - Validate the remaining breadcrumb commands, context-replacement races, navigation/rename/deletion and responsive layouts while a breadcrumb context is captured.
-- Validate tab detachment, restoring closed tabs, closing other tabs, page transfer, keyboard context requests and repeated focus changes while a tab menu is open.
+- Validate contextual closing of other tabs, restoration of navigation history, drag-and-drop page transfer, keyboard context requests and repeated focus changes while a tab menu is open. Menu-command detachment and reopening a closed tab's directory are covered.
 - Extend the bounded tab, view-mode and responsive-layout checks to navigation, background/foreground transitions and long-running stress.
 - Exercise parameter/state type replacement with dedicated changing-type fixtures; the replacement guard is implemented but the real-app checks do not force Nautilus to change an action's type.
 - Harden model lifetimes and live replacement beyond the validated cases, including disappearance of entire supported menus.
