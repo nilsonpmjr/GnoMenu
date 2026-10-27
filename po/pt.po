@@ -90,3 +90,39 @@ msgstr "Atalhos de teclado"
 msgid "Read-Only Terminal"
 msgstr "Terminal só de leitura"
 
+msgid "Desktop"
+msgstr "Área de trabalho"
+
+msgid "Additional Commands"
+msgstr "Comandos adicionais"
+
+msgid "Close Other Tabs"
+msgstr "Fechar outros separadores"
+
+msgid "Move Tab Left"
+msgstr "Mover separador para a esquerda"
+
+msgid "Move Tab Right"
+msgstr "Mover separador para a direita"
+
+msgid "Move Tab to New Window"
+msgstr "Mover separador para nova janela"
+
+msgid "Duplicate Window"
+msgstr "Duplicar janela"
+
+msgid "Force Quit"
+msgstr "Forçar encerramento"
+
+msgid "Search Settings…"
+msgstr "Definições de pesquisa…"
+
+msgid "Set as Default Terminal"
+msgstr "Definir como terminal predefinido"
+
+msgid "On"
+msgstr "Ativado"
+
+msgid "Off"
+msgstr "Desativado"
+

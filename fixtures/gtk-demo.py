@@ -79,6 +79,14 @@ class Demo(Gtk.Application):
         count = 0
         counter = Gio.SimpleAction.new_stateful('counter', None, GLib.Variant('i', 0))
         window.add_action(counter)
+        menubar = Gio.SimpleAction.new_stateful('show-menubar', None, GLib.Variant('b', True))
+
+        def show_menubar(action, value):
+            window.set_show_menubar(value.unpack())
+            action.set_state(GLib.Variant('b', window.get_show_menubar()))
+
+        menubar.connect('change-state', show_menubar)
+        window.add_action(menubar)
         status = Gtk.Label(label=f'Janela {number}: 0 comandos recebidos')
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16,
                       margin_top=24, margin_bottom=24, margin_start=24, margin_end=24)

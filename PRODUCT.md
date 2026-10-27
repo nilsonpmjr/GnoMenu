@@ -10,6 +10,9 @@ The long-term goal is broad global-menu support across system applications and c
 - Native exported GMenu models, sections, nested menus and live action state.
 - Standard exported preferences/about/quit actions as a fallback.
 - Partial action menus for Nautilus 50.4 and Ptyxis 50.1.
+- Generic additional commands from exported action groups, including typed boolean choices.
+- Files fallback on the desktop and in applications without captured commands.
+- Reversible local-menubar ownership through exported window visibility actions.
 - Exact window-scoped commands, source disposal and stale-response handling.
 - Leading-edge dropdown placement, RTL behavior and monitor-edge containment.
 - Session-language inheritance with six gettext catalogs and English fallback.
@@ -44,7 +47,7 @@ These steps prepare a community extension for the catalog. GNOME approval is a s
 - Icons and shortcut presentation where reliable metadata exists.
 - Long titles, overflow, HiDPI, RTL and multiple monitors.
 - A user-facing capability report.
-- Reversible local-menu hiding only for integrations with proven restoration.
+- Local-menu ownership for additional toolkits and applications without exported visibility controls.
 
 ## Longer term
 

@@ -162,6 +162,8 @@ def main():
                                                        env=app_env, stdout=app_log, stderr=subprocess.STDOUT)
                     extra_apps.append(subprocess.Popen(['ptyxis', '--', '/usr/bin/sleep', '3600'],
                                                        env=app_env, stdout=app_log, stderr=subprocess.STDOUT))
+                    extra_apps.append(subprocess.Popen([sys.executable, str(ROOT / 'fixtures/gtk-no-menu.py')],
+                                                       env=app_env, stdout=app_log, stderr=subprocess.STDOUT))
                 else:
                     app = subprocess.Popen([sys.executable, str(ROOT / 'fixtures/gtk-demo.py')],
                                            env=app_env, stdout=app_log, stderr=subprocess.STDOUT)

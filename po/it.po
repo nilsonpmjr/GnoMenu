@@ -90,3 +90,39 @@ msgstr "Scorciatoie da tastiera"
 msgid "Read-Only Terminal"
 msgstr "Terminale di sola lettura"
 
+msgid "Desktop"
+msgstr "Scrivania"
+
+msgid "Additional Commands"
+msgstr "Comandi aggiuntivi"
+
+msgid "Close Other Tabs"
+msgstr "Chiudi le altre schede"
+
+msgid "Move Tab Left"
+msgstr "Sposta scheda a sinistra"
+
+msgid "Move Tab Right"
+msgstr "Sposta scheda a destra"
+
+msgid "Move Tab to New Window"
+msgstr "Sposta scheda in una nuova finestra"
+
+msgid "Duplicate Window"
+msgstr "Duplica finestra"
+
+msgid "Force Quit"
+msgstr "Uscita forzata"
+
+msgid "Search Settings…"
+msgstr "Impostazioni di ricerca…"
+
+msgid "Set as Default Terminal"
+msgstr "Imposta come terminale predefinito"
+
+msgid "On"
+msgstr "Attivo"
+
+msgid "Off"
+msgstr "Disattivo"
+

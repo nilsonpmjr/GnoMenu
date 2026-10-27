@@ -73,6 +73,21 @@ export default class ShellTestDriver extends Extension {
         const terminals = await waitFor(() => windowsFor('org.gnome.Ptyxis').length === 2 &&
             windowsFor('org.gnome.Ptyxis'), 'two real Ptyxis windows');
         const binding = action => extension._bindings.find(entry => entry.actor._menuLabNode?.action === action);
+        const inventory = name => {
+            const actions = [];
+            for (const [prefix, group] of extension._source._groups) {
+                for (const action of group.list_actions().sort()) {
+                    actions.push({action: `${prefix}.${action}`,
+                        parameter: group.get_action_parameter_type(action)?.dup_string() ?? null,
+                        state: group.get_action_state(action)?.print(true) ?? null,
+                        hint: group.get_action_state_hint(action)?.print(true) ?? null,
+                        enabled: group.get_action_enabled(action)});
+                }
+            }
+            GLib.file_set_contents(GLib.build_filenamev([
+                GLib.path_get_dirname(GLib.getenv('GNOMENU_REPORT')), `${name}-actions.json`]),
+            JSON.stringify(actions, null, 2));
+        };
         const select = async (window, action) => {
             Main.activateWindow(window, global.get_current_time());
             await waitFor(() => global.display.focus_window === window &&
@@ -115,6 +130,7 @@ export default class ShellTestDriver extends Extension {
             throw new Error(`Real accessibility observation failed: ${JSON.stringify(result)}`);
         };
         await select(nautilus[0], 'win.new-tab');
+        inventory('nautilus');
         assert(extension._source.partial && !extension._source.descriptor.menuPath,
             'Real Nautilus must be discovered through its exported actions');
         assert(binding('app.preferences')?.actor.sensitive, 'Nautilus preferences must be exposed');
@@ -150,6 +166,7 @@ export default class ShellTestDriver extends Extension {
         extension._buttons[1].menu.close(0);
         passed.push('Global New Tab and Close Tab affect only the selected real Nautilus window');
         await select(terminals[0], 'win.tab.read-only');
+        inventory('ptyxis');
         assert(binding('app.preferences')?.actor.sensitive && binding('app.new-window')?.actor.sensitive &&
             binding('app.new-tab')?.actor.sensitive, 'Real Ptyxis exported commands must be present');
         const terminalSource = extension._source;
@@ -171,6 +188,30 @@ export default class ShellTestDriver extends Extension {
         await screenshot('ptyxis-menu.png');
         extension._buttons[2].menu.close(0);
         passed.push('Ptyxis action state stays isolated between two real windows and can be restored');
+        await select(nautilus[1], 'win.new-tab');
+        const desktopTarget = nautilus[1];
+        const unsupported = await waitFor(() => windowsFor('org.example.GnoMenuNoMenu')[0],
+            'unsupported application in the real-app session');
+        Main.activateWindow(unsupported, global.get_current_time());
+        await waitFor(() => global.display.focus_window === unsupported && extension._desktopMode &&
+            extension._source?.descriptor.windowPath === desktopTarget.get_gtk_window_object_path(),
+        'unsupported application falls back to the remembered Files window');
+        passed.push('An unsupported focused application retains the real Files commands and identity');
+        const beforeDesktop = await observe(desktopTarget);
+        for (const window of [...nautilus, ...terminals, unsupported])
+            window.minimize();
+        await waitFor(() => !global.display.focus_window && extension._desktopMode &&
+            extension._source?.descriptor.windowPath === desktopTarget.get_gtk_window_object_path(),
+        'desktop retains the last exact Files window');
+        assert(extension._buttons[0].get_first_child().text === tracker.get_window_app(desktopTarget).get_name(),
+            'Desktop must display Files identity');
+        binding('win.new-tab').actor.activate(null);
+        await select(desktopTarget, 'win.close-current-view');
+        await waitObserved(desktopTarget, state =>
+            state.visibleTabEntries === Math.max(2, beforeDesktop.visibleTabEntries + 1));
+        binding('win.close-current-view').actor.activate(null);
+        await waitObserved(desktopTarget, state => state.visibleTabEntries === beforeDesktop.visibleTabEntries);
+        passed.push('Desktop retains Files identity and New Tab reaches the remembered Files window');
         const current = extension._source;
         await Main.extensionManager.disableExtension(UUID);
         await waitFor(() => current.closed && extension._buttons.length === 0, 'real app cleanup');
@@ -245,6 +286,9 @@ export default class ShellTestDriver extends Extension {
         const first = extension._source;
         const firstGroup = first._groups.get('win');
         await waitFor(() => firstGroup.has_action('counter'), 'first counter');
+        await waitFor(() => !firstGroup.get_action_state('show-menubar').unpack(),
+            'native menubar hides in the captured GTK window');
+        passed.push('Imported native menu hides the fixture menubar through its exported window control');
         // Inject input only into this harness's private compositor. Exercise
         // Shell event dispatch rather than emitting actor activation signals.
         const keyboard = global.stage.context.get_backend().get_default_seat()
@@ -390,6 +434,8 @@ export default class ShellTestDriver extends Extension {
         await select(windows[1]);
         const second = extension._source;
         assert(first.closed, 'Switching focus must dispose the old source');
+        await waitFor(() => firstGroup.get_action_state('show-menubar').unpack(),
+            'previous window restores its local menubar');
         const secondGroup = second._groups.get('win');
         await waitFor(() => secondGroup.has_action('counter'), 'second counter');
         assert(secondGroup.get_action_state('counter').unpack() === 0, 'Second window starts untouched');
@@ -415,15 +461,16 @@ export default class ShellTestDriver extends Extension {
         'application without an exported menu');
         Main.activateWindow(unsupported, global.get_current_time());
         await waitFor(() => global.display.focus_window === unsupported &&
-            extension._source?.partial && extension._bindings.length === 0,
-        'unsupported app clears the previous menu');
+            extension._desktopMode && !extension._source && extension._bindings.length === 0,
+        'unsupported app selects the desktop fallback');
+        const files = Shell.AppSystem.get_default().lookup_app('org.gnome.Nautilus.desktop');
         assert(extension._buttons.length === 1 &&
-            extension._buttons[0].get_first_child().text === 'GnoMenu sem menu',
-        'Unsupported application must show honest status, not old menu headings');
-        const status = extension._buttons[0].menu._getMenuItems()[0];
-        assert(status.label.text === extension.gettext('No menu available'),
-            'Unavailable status must use the session language');
-        passed.push('Application without a menu clears the old source and displays unavailable status');
+            extension._buttons[0].get_first_child().text === (files?.get_name() ?? extension.gettext('Desktop')),
+        'Unsupported app must display Files or Desktop, never the extension name');
+        if (files)
+            assert(extension._buttons[0].menu._getMenuItems()[0].label.text === extension.gettext('New Window'),
+                'Files fallback exposes its launcher when no Files window is running');
+        passed.push('Application without captured commands displays the Files/Desktop fallback');
         await select(windows[0]);
         const current = extension._source;
         await Main.extensionManager.disableExtension(UUID);

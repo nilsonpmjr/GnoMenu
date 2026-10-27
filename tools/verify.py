@@ -52,7 +52,8 @@ report = {
         'DBusMenu adapter is tested independently; automatic source-to-window discovery and panel integration are pending.',
         'AppMenu registrar was exercised only on an isolated bus; it is not installed or started by the extension.',
         'Registry-to-source discovery uses explicitly supplied window IDs; it is not yet connected to Mutter window discovery.',
-        'Nautilus 50.4 and Ptyxis 50.1 have partial action-based support; complete native menus and other priority applications remain unverified.',
+        'Nautilus 50.4 and Ptyxis 50.1 have expanded but partial action-based support; private application actions remain inaccessible.',
+        'Local menubars are hidden only for complete imported models with an exported window visibility control; real Nautilus/Ptyxis do not export that control.',
     ],
 }
 (reports / 'verification.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')

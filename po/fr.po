@@ -90,3 +90,39 @@ msgstr "Raccourcis clavier"
 msgid "Read-Only Terminal"
 msgstr "Terminal en lecture seule"
 
+msgid "Desktop"
+msgstr "Bureau"
+
+msgid "Additional Commands"
+msgstr "Commandes supplémentaires"
+
+msgid "Close Other Tabs"
+msgstr "Fermer les autres onglets"
+
+msgid "Move Tab Left"
+msgstr "Déplacer l’onglet vers la gauche"
+
+msgid "Move Tab Right"
+msgstr "Déplacer l’onglet vers la droite"
+
+msgid "Move Tab to New Window"
+msgstr "Déplacer l’onglet vers une nouvelle fenêtre"
+
+msgid "Duplicate Window"
+msgstr "Dupliquer la fenêtre"
+
+msgid "Force Quit"
+msgstr "Forcer à quitter"
+
+msgid "Search Settings…"
+msgstr "Paramètres de recherche…"
+
+msgid "Set as Default Terminal"
+msgstr "Définir comme terminal par défaut"
+
+msgid "On"
+msgstr "Activé"
+
+msgid "Off"
+msgstr "Désactivé"
+

@@ -118,6 +118,40 @@ async function run() {
     await waitFor(() => group1.get_action_state('tabs').unpack() === 1, 'adapted window action');
     assert(group2.get_action_state('tabs').unpack() === 0, 'Adapted action must stay window-scoped');
     print('PASS: actions-only profiles expose only compatible exports and keep window scope');
+    const generic = new GMenuSource(bus, {busName: owner, appPath: '/lab/app',
+        windowPath: '/lab/window/1', applicationId: 'org.example.Unprofiled'}, () => {});
+    sources.push(generic);
+    await waitFor(() => flatten(generic.snapshot).some(item => item.action === 'win.increment'),
+        'an application without a curated profile exports additional commands');
+    assert(!flatten(generic.snapshot).some(item => item.action === 'app.settings'),
+        'Generic commands must not duplicate preferences under another settings alias');
+    print('PASS: unprofiled applications expose additional exported commands without duplicate settings');
+    const choices = flatten(actionsOnly.snapshot).filter(item => item.action === 'win.parameter-toggle');
+    assert(choices.length === 2 && choices.some(item => item.target.unpack() === true),
+        'Boolean parameter type must supply both valid typed choices');
+    assert(actionsOnly.activate(choices.find(item => item.target.unpack() === true)),
+        'A type-declared boolean target must activate');
+    await waitFor(() => group1.get_action_state('parameter-toggle').unpack(), 'typed command applies');
+    assert(!flatten(actionsOnly.snapshot).some(item => item.action === 'win.mode'),
+        'String choices absent from the D-Bus action protocol must not be guessed');
+    assert(!flatten(actionsOnly.snapshot).some(item => item.action === 'win.counter'),
+        'A state-only counter must not become a fake command');
+    print('PASS: additional commands use typed boolean choices and omit unknown targets and state-only counters');
+    first.setCaptured(true);
+    await waitFor(() => !group1.get_action_state('show-menubar').unpack(), 'local menubar hides after capture');
+    assert(group2.get_action_state('show-menubar').unpack(), 'Other window keeps its local menubar');
+    group1.change_action_state('show-menubar', new GLib.Variant('b', true));
+    await waitFor(() => !group1.get_action_state('show-menubar').unpack(), 'capture keeps the local menubar hidden');
+    first.setCaptured(false);
+    await waitFor(() => group1.get_action_state('show-menubar').unpack(), 'local menubar restores');
+    group1.change_action_state('show-menubar', new GLib.Variant('b', false));
+    await waitFor(() => !group1.get_action_state('show-menubar').unpack(), 'initial hidden preference');
+    first.setCaptured(true);
+    first.setCaptured(false);
+    assert(!group1.get_action_state('show-menubar').unpack(), 'Originally hidden menubar stays hidden');
+    group1.change_action_state('show-menubar', new GLib.Variant('b', true));
+    await waitFor(() => group1.get_action_state('show-menubar').unpack(), 'restore initial preference');
+    print('PASS: captured native menus hide locally and restore the original window preference');
     const drawnIncrement = find(first, 'Increment window 1');
     first.activate(find(first, 'Check'));
     await waitFor(() => find(first, 'Check').toggle.checked, 'boolean state update');
@@ -151,6 +185,16 @@ async function run() {
     assert(first.snapshot.length === 0, 'Disposed source clears its snapshot');
     first.destroy();
     print('PASS: source disposal is idempotent and stale activation is rejected');
+    const capture = new GMenuSource(bus, {busName: owner, menuPath: '/lab/menu/2',
+        appPath: '/lab/app', windowPath: '/lab/window/2'}, () => {});
+    sources.push(capture);
+    await waitFor(() => capture.snapshot.length && capture._groups.get('win')?.has_action('show-menubar'),
+        'temporary captured source');
+    capture.setCaptured(true);
+    await waitFor(() => !group2.get_action_state('show-menubar').unpack(), 'temporary source hides menu');
+    capture.destroy();
+    await waitFor(() => group2.get_action_state('show-menubar').unpack(), 'destruction restores local menu');
+    print('PASS: disposing a captured source restores its local menubar');
     const app = Gio.DBusActionGroup.get(bus, owner, '/lab/app');
     app.list_actions();
     await waitFor(() => app.has_action('quit'), 'quit action');

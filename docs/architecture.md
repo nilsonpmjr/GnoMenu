@@ -20,17 +20,19 @@ There is no Python helper, application launcher, network client, telemetry or cl
 
 `gmenuSource.js` imports remote models and groups through Gio. Application and window actions use separate paths. Menu traversal is bounded to 512 entries and 12 levels.
 
-Native application menus retain their labels. Conventional application actions provide translated fallback labels when no equivalent native action is present. `actionMenus.js` supplies explicit Nautilus/Ptyxis mappings; commands with missing or incompatible parameters are excluded.
+Native application menus retain their labels. Conventional application actions provide translated fallback labels when no equivalent native action is present. `actionMenus.js` supplies explicit Nautilus/Ptyxis mappings and generic additional commands for other published actions. Boolean parameter domains and available finite state hints supply typed choices; unknown parameters and non-boolean state-only counters are excluded.
 
 ## Lifetimes
 
-Every focused-window change advances an epoch and disposes the old source before the next render. Popup focus temporarily held by the Shell keeps the current target; a different application window changes it.
+The extension maintains at most two sources: the focused window and the last active Files window. Sources that are no longer either target are disposed. Changing the displayed source advances an epoch; popup focus temporarily held by the Shell keeps the current target. An empty focused source remains subscribed so newly exported commands can replace the Files fallback.
 
 The source watches its unique D-Bus owner, tracks model/action signals and coalesces updates into an idle source. Destruction disconnects those signals, removes pending work, unwatches the name and clears its state.
 
 Visible nodes carry source provenance. A state refresh may preserve an unchanged command, while changed action identities, foreign-source nodes and disposed sources are rejected.
 
-`disable()` disconnects display/window signals, destroys the current source and panel actors, cancels remaining idles and clears cached model/render state. Runtime objects are created after `enable()`.
+`disable()` disconnects display, application and window signals, destroys both sources and panel actors, cancels remaining idles and clears cached model/render state. Runtime objects are created after `enable()`.
+
+Only the displayed source is captured. A captured complete native menubar can use an exported window visibility action to hide its local counterpart. Ownership records the original boolean value and restores it when capture ends; destruction restores it before releasing the action group. Partial and truncated models do not hide local menus.
 
 ## Rendering
 

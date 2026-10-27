@@ -90,3 +90,39 @@ msgstr "Tastenkombinationen"
 msgid "Read-Only Terminal"
 msgstr "Schreibgeschütztes Terminal"
 
+msgid "Desktop"
+msgstr "Arbeitsfläche"
+
+msgid "Additional Commands"
+msgstr "Weitere Befehle"
+
+msgid "Close Other Tabs"
+msgstr "Andere Reiter schließen"
+
+msgid "Move Tab Left"
+msgstr "Reiter nach links verschieben"
+
+msgid "Move Tab Right"
+msgstr "Reiter nach rechts verschieben"
+
+msgid "Move Tab to New Window"
+msgstr "Reiter in neues Fenster verschieben"
+
+msgid "Duplicate Window"
+msgstr "Fenster duplizieren"
+
+msgid "Force Quit"
+msgstr "Beenden erzwingen"
+
+msgid "Search Settings…"
+msgstr "Sucheinstellungen…"
+
+msgid "Set as Default Terminal"
+msgstr "Als Standardterminal festlegen"
+
+msgid "On"
+msgstr "Ein"
+
+msgid "Off"
+msgstr "Aus"
+

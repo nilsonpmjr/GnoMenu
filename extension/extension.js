@@ -38,7 +38,11 @@ export default class GnoMenu extends Extension {
         this._windowSignals = [];
         this._window = null;
         this._source = null;
-        this._descriptorKey = '';
+        this._focusEntry = null;
+        this._filesEntry = null;
+        this._lastFilesWindow = null;
+        this._desktopMode = true;
+        this._unmanagedWindows = new WeakSet();
         this._epoch = 0;
         this._renderId = 0;
         this._focusId = 0;
@@ -50,16 +54,24 @@ export default class GnoMenu extends Extension {
         this._signature = null;
         this._status = _('No menu available');
         this._displaySignal = global.display.connect('notify::focus-window', () => this._syncFocus());
+        this._createdSignal = global.display.connect('window-created', () => this._queueFocus());
+        this._appSignal = Shell.AppSystem.get_default().connect('app-state-changed', () => this._queueFocus());
         this._syncFocus();
     }
 
     disable() {
         ++this._epoch;
         global.display.disconnect(this._displaySignal);
+        global.display.disconnect(this._createdSignal);
+        Shell.AppSystem.get_default().disconnect(this._appSignal);
         for (const [object, id] of this._windowSignals)
             object.disconnect(id);
         this._windowSignals = [];
-        this._source?.destroy();
+        for (const entry of new Set([this._focusEntry, this._filesEntry]))
+            entry?.source.destroy();
+        this._focusEntry = this._filesEntry = null;
+        this._lastFilesWindow = null;
+        this._unmanagedWindows = null;
         this._source = null;
         this._rendering = true;
         this._clearButtons();
@@ -72,7 +84,6 @@ export default class GnoMenu extends Extension {
         this._tree = [];
         this._appTree = [];
         this._signature = null;
-        this._descriptorKey = '';
         this._partial = false;
         this._status = null;
     }
@@ -82,57 +93,84 @@ export default class GnoMenu extends Extension {
         // A Shell popup can temporarily take keyboard focus away from its client.
         if (!window && (this._rendering || this._buttons.some(button => button.menu.isOpen)))
             return;
-        if (this._window !== window) {
-            for (const [object, id] of this._windowSignals)
-                object.disconnect(id);
-            this._windowSignals = [];
-            this._window = window;
-            if (window) {
-                this._windowSignals.push([window, window.connect('unmanaged', () => {
-                    for (const [object, id] of this._windowSignals)
-                        object.disconnect(id);
-                    this._windowSignals = [];
-                    this._window = null;
-                    this._selectSource(null);
-                })]);
-                for (const property of ['gtk-unique-bus-name', 'gtk-application-id', 'gtk-menubar-object-path',
-                    'gtk-app-menu-object-path', 'gtk-application-object-path',
-                    'gtk-window-object-path']) {
-                    this._windowSignals.push([window,
-                        window.connect(`notify::${property}`, () => this._syncFocus())]);
+        const windows = global.get_window_actors().map(actor => actor.meta_window)
+            .filter(candidate => !this._unmanagedWindows.has(candidate));
+        const files = windows.filter(candidate => candidate.get_gtk_application_id() === 'org.gnome.Nautilus');
+        if (files.includes(window))
+            this._lastFilesWindow = window;
+        if (!files.includes(this._lastFilesWindow))
+            this._lastFilesWindow = files.sort((a, b) => b.get_stable_sequence() - a.get_stable_sequence())[0] ?? null;
+        const previous = new Set([this._focusEntry, this._filesEntry]);
+        const entryFor = target => {
+            if (!target || this._unmanagedWindows.has(target))
+                return null;
+            const descriptor = sourceForWindow(target);
+            if (!descriptor)
+                return null;
+            const key = JSON.stringify([target.get_stable_sequence(), descriptor]);
+            const existing = [...previous].find(entry => entry?.key === key && !entry.source.closed);
+            if (existing)
+                return existing;
+            const entry = {key, window: target, tree: [], info: {}, source: null};
+            entry.source = new GMenuSource(Gio.DBus.session, descriptor, (tree, info) => {
+                entry.tree = tree;
+                entry.info = info;
+                if (entry === this._focusEntry || entry === this._filesEntry)
+                    this._presentSource();
+            }, this.gettext.bind(this));
+            return entry;
+        };
+        this._focusEntry = entryFor(window);
+        this._filesEntry = window === this._lastFilesWindow ? this._focusEntry : entryFor(this._lastFilesWindow);
+        for (const entry of previous) {
+            if (entry && entry !== this._focusEntry && entry !== this._filesEntry)
+                entry.source.destroy();
+        }
+        for (const [object, id] of this._windowSignals)
+            object.disconnect(id);
+        this._windowSignals = [];
+        for (const target of windows) {
+            this._windowSignals.push([target, target.connect('unmanaged', () => {
+                this._unmanagedWindows.add(target);
+                // Drop the displayed source immediately; the actor can remain
+                // in get_window_actors() until its closing animation finishes.
+                for (const entry of [this._focusEntry, this._filesEntry]) {
+                    if (entry?.window === target)
+                        entry.source.destroy();
                 }
+                if (this._lastFilesWindow === target)
+                    this._lastFilesWindow = null;
+                this._presentSource();
+                this._queueFocus();
+            })]);
+            for (const property of ['gtk-unique-bus-name', 'gtk-application-id', 'gtk-menubar-object-path',
+                'gtk-app-menu-object-path', 'gtk-application-object-path', 'gtk-window-object-path']) {
+                this._windowSignals.push([target,
+                    target.connect(`notify::${property}`, () => this._queueFocus())]);
             }
         }
-        this._selectSource(sourceForWindow(window));
+        this._presentSource();
     }
 
-    _selectSource(descriptor) {
-        const key = JSON.stringify([this._window?.get_stable_sequence(), descriptor]);
-        if (this._descriptorKey === key)
-            return;
-        this._descriptorKey = key;
-        const epoch = ++this._epoch;
-        this._source?.destroy();
-        this._source = null;
-        this._tree = [];
-        this._appTree = [];
-        this._partial = false;
-        this._signature = null;
-        this._status = descriptor ? _('Loading menu…') : _('No menu available');
+    _presentSource() {
+        const usable = entry => entry && !entry.source.closed &&
+            (entry.tree.length || entry.info.applicationMenu?.length);
+        const primary = usable(this._focusEntry);
+        const entry = primary ? this._focusEntry : usable(this._filesEntry) ? this._filesEntry : null;
+        const source = entry?.source ?? null;
+        if (this._source !== source) {
+            this._source?.setCaptured(false);
+            ++this._epoch;
+            this._source = source;
+            source?.setCaptured(true);
+        }
+        this._window = entry?.window ?? null;
+        this._desktopMode = !primary;
+        this._tree = entry?.tree ?? [];
+        this._appTree = entry?.info.applicationMenu ?? [];
+        this._partial = Boolean(entry?.info.partial);
+        this._status = entry?.info.truncated ? _('Some menu items could not be displayed') : _('No menu available');
         this._queueRender();
-        if (!descriptor)
-            return;
-        this._source = new GMenuSource(Gio.DBus.session, descriptor, (tree, info) => {
-            if (epoch !== this._epoch)
-                return;
-            this._tree = tree;
-            this._appTree = info.applicationMenu ?? [];
-            this._partial = Boolean(info.partial);
-            this._status = !info.available ? _('Application disconnected') :
-                info.truncated ? _('Some menu items could not be displayed') :
-                    info.partial && !tree.length && !this._appTree.length ? _('No menu available') : _('No menu items available');
-            this._queueRender();
-        }, this.gettext.bind(this));
     }
 
     _queueRender() {
@@ -180,8 +218,9 @@ export default class GnoMenu extends Extension {
     }
 
     _render() {
-        const app = this._window && Shell.WindowTracker.get_default().get_window_app(this._window);
-        const appName = app?.get_name() || this._window?.get_wm_class() || 'GnoMenu';
+        const app = this._window ? Shell.WindowTracker.get_default().get_window_app(this._window) :
+            Shell.AppSystem.get_default().lookup_app('org.gnome.Nautilus.desktop');
+        const appName = app?.get_name() || (this._desktopMode ? _('Desktop') : this._window?.get_wm_class()) || _('Desktop');
         const signature = `${this._epoch}:${appName}:${this._partial}:${this._status}:${structure([this._appTree, this._tree])}`;
         if (signature === this._signature) {
             this._updateBindings();
@@ -209,7 +248,11 @@ export default class GnoMenu extends Extension {
             columns.forEach((column, index) => {
                 const button = this._button(column.label || _('Menu'), index);
                 this._fill(button.menu, column.children);
-                if (!column.children.length)
+                if (index === 0 && !this._source && app) {
+                    button.menu.addAction(_('New Window'), () => app.open_new_window(-1));
+                    button.menu.addAction(_('Home'), () => app.app_info.launch_uris([
+                        Gio.File.new_for_path(GLib.get_home_dir()).get_uri()], global.create_app_launch_context(0, -1)));
+                } else if (!column.children.length)
                     button.menu.addMenuItem(new PopupMenu.PopupMenuItem(roots.length ?
                         _('Application actions unavailable') : this._status, {reactive: false}));
                 if (index === 0 && this._partial && (appItems.length || roots.length)) {

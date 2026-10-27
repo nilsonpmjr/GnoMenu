@@ -48,7 +48,10 @@ for number in (1, 2):
     action(group, 'increment', lambda _, __, counter=counter:
            counter.set_state(GLib.Variant('i', counter.get_state().unpack() + 1)))
     action(group, 'checked', state=GLib.Variant('b', False))
-    action(group, 'mode', state=GLib.Variant('s', 'one'), parameter='s')
+    mode = action(group, 'mode', state=GLib.Variant('s', 'one'), parameter='s')
+    mode.set_state_hint(GLib.Variant('as', ['one', 'two']))
+    action(group, 'parameter-toggle', state=GLib.Variant('b', False), parameter='b')
+    action(group, 'show-menubar', state=GLib.Variant('b', True))
     blocked = action(group, 'blocked', enabled=False)
     action(group, 'enable', lambda *_args, blocked=blocked: blocked.set_enabled(True))
     root = Gio.Menu()

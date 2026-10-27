@@ -24,9 +24,18 @@ subprocess.run(['gnome-extensions', 'install', '--force', str(bundle)], check=Tr
 settings = Gio.Settings.new('org.gnome.shell')
 enabled = settings.get_strv('enabled-extensions')
 disabled = settings.get_strv('disabled-extensions')
+legacy = 'gnomenu@nilsonpmjr.local'
+if uuid == 'gnomenu@nilsonpmjr.github.io' and legacy in enabled:
+    enabled = [item for item in enabled if item != legacy]
+    if legacy not in disabled:
+        disabled.append(legacy)
+    if not settings.set_strv('disabled-extensions', disabled):
+        raise RuntimeError('Could not disable the older GnoMenu development installation')
+    print('The older GnoMenu development UUID is disabled; its files are retained.')
 if uuid not in enabled:
-    if not settings.set_strv('enabled-extensions', [*enabled, uuid]):
-        raise RuntimeError('Could not enable GnoMenu in the user settings')
+    enabled.append(uuid)
+if not settings.set_strv('enabled-extensions', enabled):
+    raise RuntimeError('Could not enable GnoMenu in the user settings')
 if uuid in disabled:
     if not settings.set_strv('disabled-extensions', [item for item in disabled if item != uuid]):
         raise RuntimeError('Could not remove the previous GnoMenu disable entry')

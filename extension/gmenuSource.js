@@ -23,6 +23,8 @@ export class GMenuSource {
         this._applicationMenu = [];
         this._items = new Map();
         this._issuedNodes = new WeakSet();
+        this._captured = false;
+        this._hiddenMenubar = null;
         this.truncated = false;
         this.descriptor = descriptor;
         this.partial = !descriptor.menuPath && !descriptor.appMenuPath;
@@ -162,8 +164,11 @@ export class GMenuSource {
             actions.add(fullName);
         }
         this._snapshot = this._model ? read(this._model, 'root', 0, new Set()) :
-            this.partial ? actionMenus(this.descriptor.applicationId,
-                this._resolve.bind(this), this._gettext) : [];
+            actionMenus(this.descriptor.applicationId,
+                this._resolve.bind(this), this._gettext, this._groups, actions);
+        this.partial = !this._model && (!this._appModel || this._snapshot.length > 0);
+        if (this._snapshot.some(node => node.id === 'actions/menu/additional' && node.children.length >= 256))
+            this.truncated = true;
         const index = nodes => {
             for (const node of nodes) {
                 this._items.set(node.id, node);
@@ -173,6 +178,10 @@ export class GMenuSource {
         };
         index(this._applicationMenu);
         index(this._snapshot);
+        if (this.truncated)
+            this._restoreLocalMenubar();
+        else if (this._captured)
+            this._hideLocalMenubar();
         this._changed(this._snapshot, {available: true, truncated: this.truncated,
             applicationMenu: this._applicationMenu, partial: this.partial});
     }
@@ -218,9 +227,52 @@ export class GMenuSource {
         return true;
     }
 
+    setCaptured(captured) {
+        this._captured = captured;
+        if (captured)
+            this._hideLocalMenubar();
+        else
+            this._restoreLocalMenubar();
+    }
+
+    _hideLocalMenubar() {
+        // Only remove a local menubar when its original model is imported and
+        // the application exports a window-scoped visibility control.
+        if (this._closed || !this._model || !this._snapshot.length || this.truncated)
+            return;
+        if (this._hiddenMenubar) {
+            const {group, name} = this._hiddenMenubar;
+            if (group.has_action(name) && group.get_action_enabled(name) &&
+                group.get_action_state(name)?.unpack() === true)
+                group.change_action_state(name, new GLib.Variant('b', false));
+            return;
+        }
+        const group = this._groups.get('win');
+        for (const name of ['show-menubar', 'show-menu-bar', 'menubar-visible']) {
+            if (!group?.has_action(name))
+                continue;
+            const state = group?.get_action_state(name);
+            if (!group?.get_action_enabled(name) || state?.get_type_string() !== 'b')
+                continue;
+            this._hiddenMenubar = {group, name, original: state};
+            if (state.unpack())
+                group.change_action_state(name, new GLib.Variant('b', false));
+            break;
+        }
+    }
+
+    _restoreLocalMenubar() {
+        const hidden = this._hiddenMenubar;
+        this._hiddenMenubar = null;
+        if (hidden?.group.has_action(hidden.name) &&
+            hidden.group.get_action_state(hidden.name)?.get_type_string() === 'b')
+            hidden.group.change_action_state(hidden.name, hidden.original);
+    }
+
     destroy() {
         if (this._closed)
             return;
+        this._restoreLocalMenubar();
         this._closed = true;
         if (this._idle)
             GLib.source_remove(this._idle);

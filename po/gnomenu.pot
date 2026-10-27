@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: GnoMenu 0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-26 17:56-0300\n"
+"POT-Creation-Date: 2026-10-26 21:48-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,119 +17,155 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension/extension.js:47 extension/extension.js:93
-#: extension/extension.js:105
+#: extension/extension.js:55 extension/extension.js:172
 msgid "No menu available"
 msgstr ""
 
-#: extension/extension.js:93
-msgid "Loading menu…"
-msgstr ""
-
-#: extension/extension.js:103
-msgid "Application disconnected"
-msgstr ""
-
-#: extension/extension.js:104
+#: extension/extension.js:172
 msgid "Some menu items could not be displayed"
 msgstr ""
 
-#: extension/extension.js:105
-msgid "No menu items available"
+#: extension/extension.js:223
+msgid "Desktop"
 msgstr ""
 
-#: extension/extension.js:179
+#: extension/extension.js:246
 msgid "More"
 msgstr ""
 
-#: extension/extension.js:182
+#: extension/extension.js:249
 msgid "Menu"
 msgstr ""
 
-#: extension/extension.js:186
-msgid "Application actions unavailable"
-msgstr ""
-
-#: extension/extension.js:189
-msgid "Partial menu"
-msgstr ""
-
-#: extension/extension.js:194
-msgid "Incomplete menu"
-msgstr ""
-
-#: extension/gmenuSource.js:141 extension/gmenuSource.js:142
-msgid "Preferences…"
-msgstr ""
-
-#: extension/gmenuSource.js:142
-msgid "About…"
-msgstr ""
-
-#: extension/gmenuSource.js:142
-msgid "Quit"
-msgstr ""
-
-#: extension/actionMenus.js:10 extension/actionMenus.js:28
-msgid "File"
-msgstr ""
-
-#: extension/actionMenus.js:11 extension/actionMenus.js:29
+#: extension/extension.js:252 extension/actionMenus.js:14
+#: extension/actionMenus.js:36
 msgid "New Window"
 msgstr ""
 
-#: extension/actionMenus.js:11 extension/actionMenus.js:29
-msgid "New Tab"
-msgstr ""
-
-#: extension/actionMenus.js:12
-msgid "Reopen Closed Tab"
-msgstr ""
-
-#: extension/actionMenus.js:13
-msgid "Close Tab"
-msgstr ""
-
-#: extension/actionMenus.js:15
-msgid "Edit"
-msgstr ""
-
-#: extension/actionMenus.js:15
-msgid "Undo"
-msgstr ""
-
-#: extension/actionMenus.js:15
-msgid "Redo"
-msgstr ""
-
-#: extension/actionMenus.js:16 extension/actionMenus.js:31
-msgid "View"
-msgstr ""
-
-#: extension/actionMenus.js:17
-msgid "Show Sidebar"
-msgstr ""
-
-#: extension/actionMenus.js:18
-msgid "File Transfers"
-msgstr ""
-
-#: extension/actionMenus.js:20
-msgid "Go"
-msgstr ""
-
-#: extension/actionMenus.js:20
+#: extension/extension.js:253 extension/actionMenus.js:25
 msgid "Home"
 msgstr ""
 
-#: extension/actionMenus.js:21 extension/actionMenus.js:22
-msgid "Help"
+#: extension/extension.js:257
+msgid "Application actions unavailable"
+msgstr ""
+
+#: extension/extension.js:260
+msgid "Partial menu"
+msgstr ""
+
+#: extension/extension.js:265
+msgid "Incomplete menu"
+msgstr ""
+
+#: extension/gmenuSource.js:146 extension/gmenuSource.js:147
+msgid "Preferences…"
+msgstr ""
+
+#: extension/gmenuSource.js:147
+msgid "About…"
+msgstr ""
+
+#: extension/gmenuSource.js:147
+msgid "Quit"
+msgstr ""
+
+#: extension/actionMenus.js:13 extension/actionMenus.js:35
+msgid "File"
+msgstr ""
+
+#: extension/actionMenus.js:14 extension/actionMenus.js:36
+msgid "New Tab"
+msgstr ""
+
+#: extension/actionMenus.js:15
+msgid "Duplicate Window"
+msgstr ""
+
+#: extension/actionMenus.js:16
+msgid "Reopen Closed Tab"
+msgstr ""
+
+#: extension/actionMenus.js:17
+msgid "Close Tab"
+msgstr ""
+
+#: extension/actionMenus.js:18
+msgid "Close Other Tabs"
+msgstr ""
+
+#: extension/actionMenus.js:20
+msgid "Edit"
+msgstr ""
+
+#: extension/actionMenus.js:20
+msgid "Undo"
+msgstr ""
+
+#: extension/actionMenus.js:20
+msgid "Redo"
+msgstr ""
+
+#: extension/actionMenus.js:21 extension/actionMenus.js:38
+msgid "View"
 msgstr ""
 
 #: extension/actionMenus.js:22
+msgid "Show Sidebar"
+msgstr ""
+
+#: extension/actionMenus.js:23
+msgid "File Transfers"
+msgstr ""
+
+#: extension/actionMenus.js:25
+msgid "Go"
+msgstr ""
+
+#: extension/actionMenus.js:26
+msgid "Move Tab Left"
+msgstr ""
+
+#: extension/actionMenus.js:26
+msgid "Move Tab Right"
+msgstr ""
+
+#: extension/actionMenus.js:27
+msgid "Move Tab to New Window"
+msgstr ""
+
+#: extension/actionMenus.js:28 extension/actionMenus.js:29
+msgid "Help"
+msgstr ""
+
+#: extension/actionMenus.js:29
 msgid "Keyboard Shortcuts"
 msgstr ""
 
-#: extension/actionMenus.js:31
+#: extension/actionMenus.js:38
 msgid "Read-Only Terminal"
+msgstr ""
+
+#: extension/actionMenus.js:90
+msgid "On"
+msgstr ""
+
+#: extension/actionMenus.js:90
+msgid "Off"
+msgstr ""
+
+#: extension/actionMenus.js:92
+msgid "Force Quit"
+msgstr ""
+
+#: extension/actionMenus.js:93
+msgid "Search Settings…"
+msgstr ""
+
+#: extension/actionMenus.js:94
+msgid "Set as Default Terminal"
+msgstr ""
+
+#: extension/actionMenus.js:108
+msgid "Additional Commands"
 msgstr ""

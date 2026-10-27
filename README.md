@@ -13,11 +13,17 @@ Application menus in the GNOME top bar, with the application name first.
 | Exported GMenu models | Imported menus, sections, submenus, action state and live updates |
 | Nautilus 50.4, RPM | Partial menus built from exported application/window actions |
 | Ptyxis 50.1, RPM | Partial menus, including the current tab's read-only state |
-| Other GTK applications | Conventional application actions when published without required parameters |
+| Other GTK applications | Exported actions without required arguments, plus boolean parameters and available finite choices |
 | Signal, Obsidian, Firefox | Compatibility work remains |
 | DBusMenu | Transport, registrar and declared-ID discovery tested in isolation; not connected to the panel |
 
-See [compatibility and limitations](docs/compatibility.md). A **Partial menu** label identifies action-based integration. Local application menus remain available.
+See [compatibility and limitations](docs/compatibility.md). A **Partial menu** label identifies action-based integration. Unmapped exported actions appear under **Additional Commands**; their fallback names come from the application's action identifiers.
+
+## Desktop and local menus
+
+Outside an application with captured commands, GnoMenu shows Files. Its menus stay bound to the last active Nautilus window, including when the windows are minimized. If no Files window is available, the Files heading offers New Window and Home launchers. Without an installed Files application, the heading reads Desktop.
+
+An imported native menubar is hidden locally when the application exports a boolean window action named `show-menubar`, `show-menu-bar` or `menubar-visible`. Its original state is restored when capture ends or GnoMenu is disabled. Partial adapters and applications without that control retain their local menus. GNOME/Wayland does not provide a general way to remove arbitrary GTK4 or Electron controls from another application.
 
 ## Install for your user
 
@@ -28,6 +34,8 @@ python3 tools/install-local.py
 ```
 
 Log out and back in to load a newly installed extension on GNOME 50. The installer preserves other extensions and does not end your session.
+
+When migrating from `gnomenu@nilsonpmjr.local`, the installer disables that development identity and enables the public UUID. Its old files are retained; only one GnoMenu identity is enabled.
 
 A packaged ZIP requires GNOME Shell 50; Python, Node.js and gettext build tools are not runtime dependencies. Distribution through GNOME Extensions is pending.
 
