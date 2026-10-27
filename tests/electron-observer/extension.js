@@ -2,6 +2,7 @@
 // Copyright (C) 2026 GnoMenu contributors
 import GLib from 'gi://GLib';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+import {sourceForWindow} from './windowSource.js';
 
 export default class ElectronObserver extends Extension {
     enable() {
@@ -14,6 +15,7 @@ export default class ElectronObserver extends Extension {
                 id: window.get_id(), description: window.get_description(),
                 hasGetXwindow: typeof window.get_xwindow === 'function',
                 xid: typeof window.get_xwindow === 'function' ? window.get_xwindow() : null,
+                menuSource: sourceForWindow(window),
             }));
             GLib.file_set_contents(file, JSON.stringify({display: GLib.getenv('DISPLAY'),
                 xauthority: GLib.getenv('XAUTHORITY'), windows}));

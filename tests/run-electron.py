@@ -52,7 +52,8 @@ def main():
                                env=dict(os.environ, GNOMENU_ELECTRON_BUS='1'))
     report_dir = ROOT / 'reports/electron-export' / args.backend
     report_dir.mkdir(parents=True, exist_ok=True)
-    for name in ['result.json', 'integration.json', 'integration.json.layouts.json']:
+    for name in ['result.json', 'fixture-final.json', 'integration.json', 'integration.json.layouts.json',
+                 'integration.json.failure.json', 'integration.json.raw-layout.txt', 'integration.log']:
         (report_dir / name).unlink(missing_ok=True)
     with tempfile.TemporaryDirectory(prefix='gnomenu-electron-') as directory:
         workspace = Path(directory)
@@ -72,6 +73,8 @@ def main():
         private_runtime.mkdir(mode=0o700)
         extensions = workspace / 'data/gnome-shell/extensions'
         shutil.copytree(ROOT / 'tests/electron-observer', extensions / 'gnomenu-electron-observer@nilsonpmjr.local')
+        shutil.copy2(ROOT / 'extension/windowSource.js',
+                     extensions / 'gnomenu-electron-observer@nilsonpmjr.local/windowSource.js')
         observation = workspace / 'shell-state.json'
         env = dict(os.environ, XDG_RUNTIME_DIR=str(private_runtime), XDG_DATA_HOME=str(workspace / 'data'),
                    XDG_CONFIG_HOME=str(workspace / 'config'), XDG_CACHE_HOME=str(workspace / 'cache'),
@@ -141,7 +144,7 @@ def main():
                     integration_path = report_dir / 'integration.json'
                     integration_path.unlink(missing_ok=True)
                     check = subprocess.run(['gjs', '-m', str(ROOT / 'tests/electron-integration.js'),
-                        str(workspace / 'electron-state.json'), str(integration_path)],
+                        str(workspace / 'electron-state.json'), str(integration_path), str(observation)],
                         env=app_env, capture_output=True, text=True, timeout=35)
                     (report_dir / 'integration.log').write_text(check.stdout + check.stderr)
                     print(check.stdout, end='', flush=True)

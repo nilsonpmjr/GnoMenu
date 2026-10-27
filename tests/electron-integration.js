@@ -4,6 +4,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import {AppMenuDiscovery} from '../extension/appmenuDiscovery.js';
 import {DBusMenuSource} from '../extension/dbusmenuSource.js';
+import {verifyWindowAssociation} from './electron-window-association.js';
 
 function assert(value, message) {
     if (!value)
@@ -74,6 +75,8 @@ async function run() {
         'One actual process exports two independent menu paths');
     print('PASS: Actual Electron native handles resolve to distinct menubars despite identical titles and a shared process');
     print('PASS: Actual lazy Electron submenus populate through AboutToShow before their commands are imported');
+    observations.association = await verifyWindowAssociation(original.windows, sources, ARGV[2], state);
+    const baseline = state().windows.map(window => window.counter);
     const find = (index, label) => flatten(sources[index]?.snapshot ?? []).find(node => node.label === label);
     const reopen = async (index, label) => {
         const item = find(index, label);
@@ -85,11 +88,11 @@ async function run() {
         }, 'native menu reopen refresh');
     };
     assert(sources[0].activate(find(0, 'Increment this window')), 'First window dispatch');
-    await until(() => state().windows[0].counter === 1, 'first actual Electron handler');
-    assert(state().windows[1].counter === 0, 'First menu must not reach the second window');
+    await until(() => state().windows[0].counter === baseline[0] + 1, 'first actual Electron handler');
+    assert(state().windows[1].counter === baseline[1], 'First menu must not reach the second window');
     assert(sources[1].activate(find(1, 'Increment this window')), 'Second window dispatch');
-    await until(() => state().windows[1].counter === 1, 'second actual Electron handler');
-    assert(state().windows[0].counter === 1, 'Second menu must not reach the first window');
+    await until(() => state().windows[1].counter === baseline[1] + 1, 'second actual Electron handler');
+    assert(state().windows[0].counter === baseline[0] + 1, 'Second menu must not reach the first window');
     assert(!sources[0].activate(find(0, 'Disabled command')), 'Disabled command is rejected');
     print('PASS: GnoMenu dispatch reaches only the selected actual Electron window and rejects disabled commands');
     await until(() => sources[0]?.activate(find(0, 'Checked option')), 'current native checkbox command can dispatch');
@@ -121,7 +124,7 @@ async function run() {
     await until(() => find(0, 'Dynamic command') !== undefined, 'dynamic native layout publication');
     assert(!find(1, 'Dynamic command'), 'Dynamic menu changes remain per-window');
     await until(() => sources[0]?.activate(find(0, 'Dynamic command')), 'new native command can dispatch');
-    await until(() => state().windows[0].counter === 2, 'dynamic native command dispatch');
+    await until(() => state().windows[0].counter === baseline[0] + 2, 'dynamic native command dispatch');
     print('PASS: Actual Electron layout replacement imports a dynamic command with exact window scope');
     const stale = find(0, 'Increment this window');
     const originalSource = sources[0];
@@ -138,7 +141,7 @@ async function run() {
     assert(!originalSource.activate(stale) && !state().windows[1].closed,
         'Disposed first-window commands cannot affect the remaining window');
     sources[1].activate(find(1, 'Increment this window'));
-    await until(() => state().windows[1].counter === 2, 'remaining native menu keeps working');
+    await until(() => state().windows[1].counter === baseline[1] + 2, 'remaining native menu keeps working');
     print('PASS: Closing one actual Electron window preserves the other menu and disposed commands cannot dispatch');
     GLib.file_set_contents(ARGV[1], JSON.stringify({success: true, descriptors: evidence, finalState: state(), observations}, null, 2));
 }

@@ -11,16 +11,17 @@ Electron `43.8.3`, GNOME Shell `50.6`, Wayland compositor with a private XWaylan
 | XWayland | Two distinct native handles register two menubars through one unique D-Bus owner, with distinct object paths | Both windows have identical titles and the same PID. Discovery uses the fixture's actual native handles, not titles or PIDs. Private X11 property reads corroborate those selected handles. |
 | Lazy menus | File and View populate through `AboutToShow` | Looking only at the initial layout misses real commands. |
 | Invocation | Each menu increments only its own window's counter; a disabled command is rejected | GnoMenu's existing `AppMenuDiscovery` and `DBusMenuSource` are used directly. |
+| GTK association | Temporary standard X11 GTK properties give each actual Meta window a distinct GMenu/action descriptor; imported commands reach only the originating native window | The unchanged production `sourceForWindow` and `GMenuSource` are exercised. This is a single-command probe using known fixture handles, not a full bridge or a panel rendering test. Cleanup removes its properties/exports and rejects disposed commands. |
 | Checkbox | Its native callback changes the selected window's checked value, while the server still advertises `toggle-state=0` after reopening and a 500ms wait | The imported unchecked state agrees with raw `GetLayout`. This is a recorded synchronization gap, not a passing claim for checkbox state fidelity. No local state is invented to conceal the mismatch. |
 | Dynamic layout | A new command is imported and invoked after native model replacement/preparation | The other window's menu remains unchanged. |
 | Window close | The first declaration is withdrawn, its source is disposed and its old command is rejected; the remaining window's menu still works | Source lifecycle is managed by the replay's discovery callback; the production Shell integration is still pending. |
 | Native Wayland | Two actual Wayland windows, no registrar declarations during the recorded interval of at least three seconds | The returned native handles are opaque values and are never coerced into XIDs. This is bounded to this runtime, fixture and interval. |
 
-Six XWayland check groups and two Wayland observation groups pass. Passing the replay means those declared checks completed; it does not certify full menu-state fidelity, support for vendor applications or universal Wayland behavior.
+Nine XWayland check groups and two Wayland observation groups pass. Passing the replay means those declared checks completed; it does not certify full menu-state fidelity, support for vendor applications or universal Wayland behavior.
 
 ## Why panel integration is still pending
 
-The inspected `Meta.Window` objects expose an internal ID different from the XID and do not expose `get_xwindow`. Their descriptions contain the corresponding XID in this XWayland observation, but that textual format is not used as a production association contract. The fixture can supply exact native handles; arbitrary third-party windows cannot yet be bound through the same validated public path.
+The inspected `Meta.Window` objects expose an internal ID different from the XID and do not expose `get_xwindow`. The new [GTK property probe](window-association.md#standard-gtk-property-association-probe) validates a narrow association path using the fixture's exact native handles, without parsing descriptions. Arbitrary third-party identity/lifecycle handling, a complete DBusMenu-to-GMenu bridge and panel rendering remain pending.
 
 The registrar starts only on the private session bus. GnoMenu does not claim the registrar name in the regular desktop, force a backend change or hide a third-party local menu as part of this experiment. Native Wayland needs a cooperative association/export path. Flatpak permissions and the actual vendor application lifecycle require separate tests.
 
@@ -48,8 +49,11 @@ Local artifacts, excluded from Git:
 - `reports/electron-export/x11/integration.json.raw-layout.txt`: raw server-advertised layout after the checkbox operation.
 - `reports/electron-export/{x11,wayland}/result.json`: native handles, Meta observations and registrar records.
 - `reports/electron-rea.json` and `reports/electron-rea-complete.json`: fuse observations and controlled process Evidence.
+- `reports/electron-association-rea-final.json`: controlled replay including the standard GTK property association probe.
 
 ## REA evidence and limits
+
+GTK association replay Evidence: `ev_4e22126a69ac6543511951b34208272c172fece08f7443b71f1242f2a6b041e2`, exit code 0, eleven check groups. The same sampling, environment and observation limits below apply. The fixture's native handles supply the experiment's X11 identities; production third-party identity validation remains unproven.
 
 Obsidian fuse Evidence: `ev_0a47770563f3fb47c75f7b0e2ae25d25653f9587be50deb3342604246b18ee45`. Signal fuse Evidence: `ev_a2a7dab8c0c58cfee7e1599db3b4ba2cd48ca725e83310d7f1ce7b2f6a1f3d0e`. Controlled replay Evidence: `ev_ce378581bc20f6a32ef059312df721362473ff15f0f718eb82a14cb98e3e8042`, exit code 0.
 
