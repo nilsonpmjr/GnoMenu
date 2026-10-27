@@ -46,6 +46,8 @@ Fixture Shell tests also inject virtual keyboard and pointer events into the pri
 
 GitHub Actions runs lint, protocol, translation and package checks in a clean Fedora container. Full compositor and real-application checks are a separate local requirement; the workflow does not claim to exercise a graphical desktop.
 
+The optional `native-exporter/` library is separate from the runtime ZIP. CI compiles it with warnings treated as errors. Changes to it also require the local real-app checks in `docs/native-exporter.md`; the regular verifier does not load it. Its test harness scopes the preload to private Nautilus processes.
+
 ## Review
 
 Keep changes readable and explain why each action and API is used. AI-assisted contributions require the same maintainer understanding, testing and review as other contributions. Do not submit code that the maintainer cannot explain.

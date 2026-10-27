@@ -31,6 +31,7 @@ if found is None:
     raise SystemExit(0)
 lists = []
 tabs = []
+names = set()
 visited = 0
 
 
@@ -41,6 +42,10 @@ def walk(node, depth=0):
         return
     try:
         role = node.get_role()
+        if os.environ.get('GNOMENU_OBSERVE_FILES') == '1' and node.get_state_set().contains(Atspi.StateType.SHOWING):
+            name = node.get_name()
+            if name:
+                names.add(name)
         children = [node.get_child_at_index(i) for i in range(node.get_child_count())]
         if role == Atspi.Role.PAGE_TAB:
             tabs.append(node.get_name())
@@ -55,4 +60,4 @@ def walk(node, depth=0):
 
 walk(found)
 print(json.dumps({'found': True, 'frames': frames, 'visibleTabEntries': max([len(tabs), *lists]),
-                  'tabLists': lists, 'tabs': tabs}, ensure_ascii=False))
+                  'tabLists': lists, 'tabs': tabs, 'names': sorted(names)}, ensure_ascii=False))

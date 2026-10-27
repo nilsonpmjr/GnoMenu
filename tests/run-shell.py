@@ -26,7 +26,10 @@ def main():
     parser.add_argument('--locale', help='Test/demo only: override locale, e.g. pt_BR.UTF-8; default inherits session')
     parser.add_argument('--real-apps', action='store_true', help='Use real Nautilus and Ptyxis in the private session')
     parser.add_argument('--bundle', type=Path, help='Test this built ZIP instead of the source directory')
+    parser.add_argument('--native-exporter', type=Path, help='Opt-in GTK4 library for the private Nautilus processes only')
     args = parser.parse_args()
+    if args.native_exporter and (not args.real_apps or not args.native_exporter.resolve().is_file()):
+        parser.error('--native-exporter requires --real-apps and an existing shared library')
     if args.duration is not None and (not args.interactive or args.duration <= 0):
         parser.error('--duration requires --interactive and a positive number')
     if args.locale and not re.fullmatch(r'[a-z]{2,3}_[A-Z]{2}\.UTF-8', args.locale):
@@ -42,6 +45,8 @@ def main():
     report_dir = ROOT / ('reports/demo-session' if args.interactive else 'reports/dev-session')
     if args.real_apps:
         report_dir = report_dir / 'real-apps'
+    if args.native_exporter:
+        report_dir = report_dir / 'native-exporter'
     if args.locale:
         report_dir = report_dir / 'locales' / args.locale
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -84,6 +89,9 @@ def main():
                    LIBGL_ALWAYS_SOFTWARE='1', NO_AT_BRIDGE='1', GTK_A11Y='none')
         if args.real_apps:
             env['GNOMENU_REAL_APPS'] = '1'
+            if args.native_exporter:
+                env['GNOMENU_TEST_NATIVE_EXPORTER'] = '1'
+                env['GNOMENU_OBSERVE_FILES'] = '1'
             # A private accessibility bus observes only these test applications.
             # Do not attach the observer to the user's desktop accessibility bus.
             accessibility_config = workspace / 'accessibility.conf'
@@ -153,10 +161,15 @@ def main():
                     folders = [workspace / 'GnoMenu test folder A', workspace / 'GnoMenu test folder B']
                     for folder in folders:
                         folder.mkdir()
+                        if args.native_exporter:
+                            (folder / '.gnomenu-hidden-test').write_text('Native exporter test fixture.\n')
+                    files_env = dict(app_env)
+                    if args.native_exporter:
+                        files_env.update(GNOMENU_NATIVE_EXPORT='1', LD_PRELOAD=str(args.native_exporter.resolve()))
                     app = subprocess.Popen(['nautilus', '--new-window', folders[0].as_uri()],
-                                           env=app_env, stdout=app_log, stderr=subprocess.STDOUT)
+                                           env=files_env, stdout=app_log, stderr=subprocess.STDOUT)
                     extra_apps.append(subprocess.Popen(['nautilus', '--new-window', folders[1].as_uri()],
-                                                       env=app_env, stdout=app_log, stderr=subprocess.STDOUT))
+                                                       env=files_env, stdout=app_log, stderr=subprocess.STDOUT))
                     # Both terminal windows run only sleep, avoiding shell startup files.
                     unsupported_app = subprocess.Popen(['ptyxis', '--', '/usr/bin/sleep', '3600'],
                                                        env=app_env, stdout=app_log, stderr=subprocess.STDOUT)

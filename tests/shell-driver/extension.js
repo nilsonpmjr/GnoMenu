@@ -48,7 +48,8 @@ export default class ShellTestDriver extends Extension {
             return;
         this._started = true;
         const passed = [];
-        const run = GLib.getenv('GNOMENU_REAL_APPS') === '1' ? this._runRealApps(passed) : this._run(passed);
+        const run = GLib.getenv('GNOMENU_TEST_NATIVE_EXPORTER') === '1' ? this._runNativeExporter(passed) :
+            GLib.getenv('GNOMENU_REAL_APPS') === '1' ? this._runRealApps(passed) : this._run(passed);
         run.then(() => {
             GLib.file_set_contents(reportPath, JSON.stringify({success: true, passed}, null, 2));
         }).catch(error => {
@@ -56,6 +57,119 @@ export default class ShellTestDriver extends Extension {
             GLib.file_set_contents(reportPath,
                 JSON.stringify({success: false, passed, error: `${error.message}\n${error.stack}`}, null, 2));
         });
+    }
+
+    async _runNativeExporter(passed) {
+        const extension = await waitFor(() => Main.extensionManager.lookup(UUID)?.stateObj, 'extension loads');
+        await waitFor(() => !Main.layoutManager._startingUp, 'Shell starts');
+        Main.overview.hide();
+        await waitFor(() => !Main.overview.visible && !Main.overview.animationInProgress, 'overview hides');
+        const windows = await waitFor(() => {
+            const found = global.get_window_actors().map(actor => actor.meta_window)
+                .filter(window => window.get_gtk_application_id() === 'org.gnome.Nautilus');
+            return found.length === 2 ? found.sort((a, b) => a.get_stable_sequence() - b.get_stable_sequence()) : null;
+        }, 'two real Files windows');
+        const binding = action => extension._bindings.find(entry => entry.actor._menuLabNode?.action === action);
+        const select = async window => {
+            Main.activateWindow(window, global.get_current_time());
+            await waitFor(() => global.display.focus_window === window &&
+                extension._source?.descriptor.windowPath === window.get_gtk_window_object_path() &&
+                extension._source.descriptor.menuPath && binding('win.gnomenu.view.show-hidden-files')?.actor.sensitive,
+            'real native menu and widget action proxies are imported', 16000);
+        };
+        const observe = async window => {
+            const process = Gio.Subprocess.new(['python3', GLib.getenv('GNOMENU_OBSERVER'),
+                String(window.get_pid()), window.title], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+            return new Promise((resolve, reject) => process.communicate_utf8_async(null, null, (child, result) => {
+                try {
+                    const [, stdout, stderr] = child.communicate_utf8_finish(result);
+                    if (!child.get_successful())
+                        throw new Error(stderr);
+                    resolve(JSON.parse(stdout));
+                } catch (error) {
+                    reject(error);
+                }
+            }));
+        };
+        const waitHidden = async (window, visible) => {
+            const deadline = GLib.get_monotonic_time() + 8000000;
+            while (GLib.get_monotonic_time() < deadline) {
+                const state = await observe(window);
+                if (state.found && state.names?.some(name => name.includes('.gnomenu-hidden-test')) === visible)
+                    return state;
+            }
+            throw new Error(`Actual hidden-file visibility did not become ${visible}`);
+        };
+        await select(windows[0]);
+        assert(!extension._source.partial && extension._buttons.length === 3,
+            'Bridge must import the two actual menu models, without synthetic categories');
+        assert(binding('win.gnomenu.view.zoom-in') && binding('win.gnomenu.view.sort') &&
+            binding('win.gnomenu.view.show-hidden-files'), 'Native custom zoom, typed sort and hidden-file commands must exist');
+        const firstGroup = extension._source._groups.get('win');
+        await waitFor(() => firstGroup.has_action('show-menubar') &&
+            !firstGroup.get_action_state('show-menubar').unpack(), 'captured native controls hide');
+        passed.push('Real Main Menu and View Options models, custom zoom buttons and tuple targets import without invented menus');
+        await waitHidden(windows[0], false);
+        binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
+        await waitFor(() => binding('win.gnomenu.view.show-hidden-files').actor._menuLabNode.toggle.checked,
+            'native hidden-file state updates');
+        const visible = await waitHidden(windows[0], true);
+        await select(windows[1]);
+        await waitFor(() => firstGroup.get_action_state('show-menubar').unpack(), 'previous window controls restore');
+        await waitFor(() => binding('win.gnomenu.view.show-hidden-files').actor._menuLabNode.toggle.checked,
+            'Nautilus propagates its native shared hidden-file preference');
+        await waitHidden(windows[1], true);
+        const secondGroup = extension._source._groups.get('win');
+        const secondSortBefore = secondGroup.get_action_state('gnomenu.view.sort');
+        passed.push('Imported widget command reveals real hidden files and preserves Nautilus shared-preference behavior');
+        await select(windows[0]);
+        binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
+        await waitHidden(windows[0], false);
+        const originalSort = firstGroup.get_action_state('gnomenu.view.sort');
+        const sort = extension._bindings.find(entry => entry.actor._menuLabNode?.action === 'win.gnomenu.view.sort' &&
+            entry.actor._menuLabNode.enabled && !entry.actor._menuLabNode.target.equal(originalSort)).actor;
+        assert(sort._menuLabNode.target.get_type_string() === '(sb)', 'Sort targets must retain the original tuple type');
+        sort.activate(null);
+        await waitFor(() => firstGroup.get_action_state('gnomenu.view.sort').equal(sort._menuLabNode.target),
+            'native sort tuple is accepted by the actual widget group');
+        await select(windows[1]);
+        assert(secondGroup.get_action_state('gnomenu.view.sort').equal(secondSortBefore),
+            'Sort command must not change the other directory window');
+        await select(windows[0]);
+        firstGroup.activate_action('gnomenu.view.sort', originalSort);
+        await waitFor(() => firstGroup.get_action_state('gnomenu.view.sort').equal(originalSort), 'restore original sort');
+        passed.push('Original tuple sort targets reach the correct Files window and native state can be restored');
+        const directory = GLib.path_get_dirname(GLib.getenv('GNOMENU_REPORT'));
+        GLib.file_set_contents(GLib.build_filenamev([directory, 'native-model.json']), JSON.stringify({
+            headings: extension._buttons.map(button => button.get_first_child().text),
+            menuPath: extension._source.descriptor.menuPath,
+            busOwner: extension._source.descriptor.busName,
+            windowPaths: windows.map(window => window.get_gtk_window_object_path()),
+            actions: extension._bindings.map(entry => ({label: entry.actor.label?.text,
+                action: entry.actor._menuLabNode.action, target: entry.actor._menuLabNode.target?.print(true) ?? null})),
+            visibleFileEvidence: visible,
+        }, null, 2));
+        const capture = async name => {
+            const stream = Gio.File.new_for_path(GLib.build_filenamev([directory, name]))
+                .replace(null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+            try {
+                await new Shell.Screenshot().screenshot(false, stream);
+            } finally {
+                stream.close(null);
+            }
+        };
+        const menuFor = action => extension._buttons.find(button => button.menu.actor.contains(binding(action).actor)).menu;
+        menuFor('win.gnomenu.view.show-hidden-files').open(0);
+        await capture('native-menu.png');
+        menuFor('win.gnomenu.view.show-hidden-files').close(0);
+        menuFor('app.preferences').open(0);
+        await capture('native-main-menu.png');
+        menuFor('app.preferences').close(0);
+        await Main.extensionManager.disableExtension(UUID);
+        await waitFor(() => firstGroup.get_action_state('show-menubar').unpack() && extension._buttons.length === 0,
+            'disable restores the original controls');
+        await capture('native-controls-restored.png');
+        passed.push('Switching windows and disabling the extension restore the original native menu controls');
     }
 
     async _runRealApps(passed) {

@@ -46,3 +46,13 @@ jobs:
             reports/integration.json
             reports/i18n.json
             reports/release-readiness.json
+
+  native-exporter-build:
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:44
+    steps:
+      - name: Install native build dependencies
+        run: dnf -y install git python3 gcc gtk4-devel pkgconf-pkg-config
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Compile the optional experimental exporter
+        run: python3 tools/build-native-exporter.py

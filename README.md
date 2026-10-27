@@ -65,6 +65,10 @@ python3 tools/bootstrap-devkit.py
 
 This downloads a matching Fedora RPM, verifies its signature and extracts the viewer locally. It does not install host packages.
 
+## Experimental Nautilus exporter
+
+An optional [native Nautilus exporter experiment](docs/native-exporter.md) imports its real Main Menu and View Options, including widget actions and local-control restoration. It runs only through the private test/demo harness and is not included in the extension ZIP or enabled by the installer.
+
 ## Languages
 
 GnoMenu inherits the session language through gettext. Initial catalogs cover Brazilian and European Portuguese, Spanish, French, German and Italian. English is the fallback.

@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+FROM registry.fedoraproject.org/fedora:44
+RUN dnf -y install gcc gtk4-devel pkgconf-pkg-config && dnf clean all
+WORKDIR /src

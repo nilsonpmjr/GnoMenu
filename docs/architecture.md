@@ -48,6 +48,10 @@ Checkbox and radio commands expose their respective ATK menu-item roles. PopupMe
 
 The Extension base class initializes the `gnomenu` gettext domain from metadata. Gio-only modules receive a translator function so they remain testable outside the Shell. Exported application labels are never passed through GnoMenu's translator.
 
+## Native exporter experiment
+
+The separate optional native exporter is documented in [the prototype guide](native-exporter.md). It operates inside test Nautilus processes, publishes real native models through standard GTK metadata and forwards widget actions through the exact window action map. The Shell runtime does not load its library. It is outside the installable ZIP and has a separate validation command.
+
 ## Staged DBusMenu work
 
 The DBusMenu source, registrar and declared-ID resolver have private-bus integration tests. They remain outside the distribution ZIP and the production panel until actual Mutter-window association is proven.
