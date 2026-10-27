@@ -54,6 +54,8 @@ The Extension base class initializes the `gnomenu` gettext domain from metadata.
 
 The separate optional native exporter is documented in [the prototype guide](native-exporter.md). It operates inside test Nautilus processes, publishes real native models through standard GTK metadata and forwards widget actions through the exact window action map. The Shell runtime does not load its library. It is outside the installable ZIP and has a separate validation command.
 
+Toolbar, tab, breadcrumb and file-context wrappers carry the Files layout marker at creation; publishing a shared root does not mark every child indiscriminately. Real Back/Forward history popups stay unmarked and retain their native headings. Their aliases pin a popup generation, native model, active slot and location. Notifications permanently invalidate snapshots after slot/location changes, and dispatch checks the context again before resolving the widget group.
+
 ## Staged DBusMenu work
 
 The DBusMenu source, registrar and declared-ID resolver have private-bus integration tests. They remain outside the distribution ZIP and the production panel until actual Mutter-window association is proven.

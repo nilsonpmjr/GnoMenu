@@ -722,6 +722,67 @@ export default class ShellTestDriver extends Extension {
         menuFor('win.gnomenu.slot.reload').open(0);
         await capture('native-current-folder.png');
         menuFor('win.gnomenu.slot.reload').close(0);
+
+        const historyCommand = (direction, label) => extension._bindings.find(entry =>
+            entry.actor._menuLabNode.action?.startsWith('win.gnomenu.history.') &&
+            entry.actor._menuLabNode.action.endsWith(`.slot.${direction}-n`) && entry.actor._menuLabNode.label === label);
+        const historyEvidence = [];
+        const historyPopup = async (direction, label) => {
+            await select(windows[0]);
+            await rightClickPath(direction === 'back' ? 244 : 280);
+            await waitFor(() => historyCommand(direction, label)?.actor.sensitive,
+                `native ${direction} history model is captured`);
+            await dismissBreadcrumbPopup();
+            const entry = historyCommand(direction, label);
+            const node = entry.actor._menuLabNode;
+            assert(node.target?.get_type_string() === 'u', 'Native history index retains its uint32 type');
+            const button = extension._buttons.find(candidate => candidate.menu.actor.contains(entry.actor));
+            assert(extension._buttons.indexOf(button) === extension._buttons.length - 2,
+                'The additional native history menu appears before Help');
+            button.menu.open(0);
+            await capture(`native-history-${direction}.png`);
+            button.menu.close(0);
+            historyEvidence.push({direction, heading: button.get_first_child().text, label,
+                action: node.action, target: node.target.print(true), windowPath: extension._source.descriptor.windowPath});
+            return entry;
+        };
+        const otherTitle = windows[1].title;
+        let historyEntry = await historyPopup('back', currentDirectory.get_basename());
+        const replacedHistoryAlias = historyEntry.actor._menuLabNode.action.slice(4);
+        historyEntry = await historyPopup('back', currentDirectory.get_basename());
+        await waitFor(() => !firstGroup.has_action(replacedHistoryAlias), 'reopening history retires its previous snapshot');
+        assert(historyEntry.actor._menuLabNode.action.slice(4) !== replacedHistoryAlias,
+            'Each history popup receives a fresh scoped alias');
+        passed.push('Actual Back history appears as an additional named native menu and reopening retires its snapshot');
+        const backAlias = historyEntry.actor._menuLabNode.action.slice(4);
+        const backTarget = historyEntry.actor._menuLabNode.target;
+        historyEntry.actor.activate(null);
+        await waitFor(() => windows[0].title === currentDirectory.get_basename() &&
+            !firstGroup.has_action(backAlias), 'captured Back history navigates to its actual directory and retires');
+        firstGroup.activate_action(backAlias, backTarget);
+        await observe(windows[0]);
+        assert(windows[0].title === currentDirectory.get_basename() && windows[1].title === otherTitle,
+            'Retired Back history cannot move either window');
+        assertFilesHeadings();
+        passed.push('Typed Back history changes only its exact Files window and old indices retire after navigation');
+        historyEntry = await historyPopup('forward', createdName);
+        const forwardAlias = historyEntry.actor._menuLabNode.action.slice(4);
+        historyEntry.actor.activate(null);
+        await waitFor(() => windows[0].title === createdName && !firstGroup.has_action(forwardAlias),
+            'captured Forward history navigates to the real child directory and retires');
+        assert(windows[1].title === otherTitle, 'Forward history must preserve the other Files window');
+        assertFilesHeadings();
+        passed.push('Actual Forward history retains its native heading and uint32 target and disappears after navigation');
+        historyEntry = await historyPopup('back', currentDirectory.get_basename());
+        const tabHistoryAlias = historyEntry.actor._menuLabNode.action.slice(4);
+        firstGroup.activate_action('new-tab', null);
+        await waitTabs(2);
+        await waitFor(() => !firstGroup.has_action(tabHistoryAlias), 'changing the active slot retires captured history');
+        firstGroup.activate_action('close-current-view', null);
+        await waitTabs(1);
+        assertFilesHeadings();
+        GLib.file_set_contents(GLib.build_filenamev([directory, 'native-history.json']), JSON.stringify(historyEvidence, null, 2));
+        passed.push('Switching the active native tab retires its history aliases and removes the additional heading');
         await Main.extensionManager.disableExtension(UUID);
         await waitFor(() => firstGroup.get_action_state('show-menubar')?.unpack() && extension._buttons.length === 0,
             'disable restores the original controls');

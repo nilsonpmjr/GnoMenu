@@ -16,6 +16,21 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(GActionGroup, g_object_unref)
 #define BREADCRUMB_KEY "gnomenu-breadcrumb-context"
 #define FILE_VIEW_KEY "gnomenu-file-view-context"
 #define FILE_POPUP_KEY "gnomenu-file-popup-context"
+#define HISTORY_KEY "gnomenu-history-context"
+
+typedef struct {
+    GWeakRef controls;
+    GWeakRef slot;
+    GFile *location;
+    GMenuModel *model;
+    gulong controls_signal;
+    gulong slot_signal;
+    guint token;
+    gboolean invalidated;
+} HistoryContext;
+
+static gboolean history_valid(GtkPopover *popover, guint token);
+static void append_files_menu(GMenu *root, const char *caption, GMenuModel *model);
 
 typedef struct {
     guint epoch;
@@ -48,6 +63,8 @@ typedef struct {
     guint breadcrumb_token;
     GWeakRef file_popup;
     guint file_popup_token;
+    GWeakRef history;
+    guint history_token;
     char *original;
     GSimpleAction *action;
     guint seen;
@@ -76,6 +93,8 @@ typedef struct {
     guint copying_breadcrumb_token;
     GtkPopover *copying_file_popup;
     guint copying_file_token;
+    GtkPopover *copying_history;
+    guint copying_history_token;
 } WindowExport;
 
 typedef struct {
@@ -87,6 +106,7 @@ typedef struct {
 static guint next_tab_token;
 static guint next_breadcrumb_token;
 static guint next_file_token;
+static guint next_history_token;
 
 static gboolean breadcrumb_valid(GtkPopover *popover, guint token)
 {
@@ -230,6 +250,9 @@ static void proxy_activate(GSimpleAction *action, GVariant *target, gpointer dat
     g_autoptr(GObject) tab_page = g_weak_ref_get(&proxy->tab_page);
     g_autoptr(GtkPopover) breadcrumb = g_weak_ref_get(&proxy->breadcrumb);
     g_autoptr(GtkPopover) file_popup = g_weak_ref_get(&proxy->file_popup);
+    g_autoptr(GtkPopover) history = g_weak_ref_get(&proxy->history);
+    if (proxy->history_token && (!history || !history_valid(history, proxy->history_token)))
+        return;
     if (proxy->file_popup_token && (!file_popup || !file_popup_valid(file_popup, proxy->file_popup_token)))
         return;
     if (proxy->breadcrumb_token && (!breadcrumb || !breadcrumb_valid(breadcrumb, proxy->breadcrumb_token)))
@@ -253,6 +276,9 @@ static void proxy_activate(GSimpleAction *action, GVariant *target, gpointer dat
 static void proxy_change(GSimpleAction *action, GVariant *state, gpointer data)
 {
     Proxy *proxy = data;
+    g_autoptr(GtkPopover) history = g_weak_ref_get(&proxy->history);
+    if (proxy->history_token && (!history || !history_valid(history, proxy->history_token)))
+        return;
     g_autoptr(GtkPopover) file_popup = g_weak_ref_get(&proxy->file_popup);
     if (proxy->file_popup_token && (!file_popup || !file_popup_valid(file_popup, proxy->file_popup_token)))
         return;
@@ -276,6 +302,7 @@ static void proxy_free(gpointer data)
     g_weak_ref_clear(&proxy->tab_page);
     g_weak_ref_clear(&proxy->breadcrumb);
     g_weak_ref_clear(&proxy->file_popup);
+    g_weak_ref_clear(&proxy->history);
     g_free(proxy->original);
     g_free(proxy);
 }
@@ -348,6 +375,7 @@ static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *orig
     g_autofree char *local = tab_action ? g_strdup_printf("gnomenu.tab.%u.%s", export->copying_tab_token, name) :
         breadcrumb_action ? g_strdup_printf("gnomenu.pathbar.%u.%s", export->copying_breadcrumb_token, name) :
         export->copying_file_popup ? g_strdup_printf("gnomenu.files.%u.%s", export->copying_file_token, full) :
+        export->copying_history ? g_strdup_printf("gnomenu.history.%u.%s", export->copying_history_token, full) :
         g_strconcat("gnomenu.", full, NULL);
     Proxy *proxy = g_hash_table_lookup(export->proxies, local);
     const GVariantType *parameter = g_action_group_get_action_parameter_type(group, name);
@@ -375,6 +403,8 @@ static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *orig
         proxy->breadcrumb_token = breadcrumb_action ? export->copying_breadcrumb_token : 0;
         g_weak_ref_init(&proxy->file_popup, export->copying_file_popup);
         proxy->file_popup_token = export->copying_file_popup ? export->copying_file_token : 0;
+        g_weak_ref_init(&proxy->history, export->copying_history);
+        proxy->history_token = export->copying_history ? export->copying_history_token : 0;
         proxy->original = g_strdup(full);
         proxy->action = state ? g_simple_action_new_stateful(local, parameter, state) :
             g_simple_action_new(local, parameter);
@@ -628,7 +658,7 @@ static void collect_file_popup(WindowExport *export, GtkWidget *window, GtkPopov
     export->copying_file_popup = NULL;
     g_auto(GStrv) parts = g_strsplit(capture->title, "_", -1);
     g_autofree char *caption = g_strjoinv("__", parts);
-    g_menu_append_submenu(root, caption, G_MENU_MODEL(copy));
+    append_files_menu(root, caption, G_MENU_MODEL(copy));
 }
 
 static gboolean is_breadcrumb_popover(GtkPopover *popover)
@@ -688,6 +718,110 @@ void gtk_popover_set_pointing_to(GtkPopover *popover, const GdkRectangle *rectan
     original(popover, rectangle);
 }
 
+static gboolean history_valid(GtkPopover *popover, guint token)
+{
+    HistoryContext *context = g_object_get_data(G_OBJECT(popover), HISTORY_KEY);
+    if (!context || context->invalidated || context->token != token)
+        return FALSE;
+    g_autoptr(GtkWidget) controls = g_weak_ref_get(&context->controls);
+    g_autoptr(GObject) slot = g_weak_ref_get(&context->slot);
+    g_autoptr(GObject) current = NULL;
+    g_autoptr(GFile) location = NULL;
+    if (!controls || !slot || !gtk_widget_get_mapped(controls))
+        return FALSE;
+    g_object_get(controls, "window-slot", &current, NULL);
+    g_object_get(slot, "location", &location, NULL);
+    return current == slot && location && g_file_equal(context->location, location) &&
+        gtk_popover_menu_get_menu_model(GTK_POPOVER_MENU(popover)) == context->model;
+}
+
+static void history_changed(GObject *object, GParamSpec *spec, gpointer data)
+{
+    (void)object;
+    (void)spec;
+    GtkPopover *popover = data;
+    HistoryContext *context = g_object_get_data(G_OBJECT(popover), HISTORY_KEY);
+    if (context && !history_valid(popover, context->token))
+        context->invalidated = TRUE;
+}
+
+static void history_free(gpointer data)
+{
+    HistoryContext *context = data;
+    g_autoptr(GObject) controls = g_weak_ref_get(&context->controls);
+    g_autoptr(GObject) slot = g_weak_ref_get(&context->slot);
+    if (controls && context->controls_signal)
+        g_signal_handler_disconnect(controls, context->controls_signal);
+    if (slot && context->slot_signal)
+        g_signal_handler_disconnect(slot, context->slot_signal);
+    g_weak_ref_clear(&context->controls);
+    g_weak_ref_clear(&context->slot);
+    g_clear_object(&context->location);
+    g_clear_object(&context->model);
+    g_free(context);
+}
+
+static void capture_history_popup(GtkPopover *popover)
+{
+    if (!GTK_IS_POPOVER_MENU(popover))
+        return;
+    GtkWidget *button = gtk_widget_get_parent(GTK_WIDGET(popover));
+    if (!GTK_IS_BUTTON(button) || !gtk_widget_get_tooltip_text(button))
+        return;
+    const char *action = gtk_actionable_get_action_name(GTK_ACTIONABLE(button));
+    const char *expected = g_strcmp0(action, "slot.back") == 0 ? "slot.back-n" :
+        g_strcmp0(action, "slot.forward") == 0 ? "slot.forward-n" : NULL;
+    if (!expected)
+        return;
+    GtkWidget *controls = gtk_widget_get_parent(button);
+    while (controls && !g_str_equal(G_OBJECT_TYPE_NAME(controls), "NautilusHistoryControls"))
+        controls = gtk_widget_get_parent(controls);
+    GMenuModel *model = gtk_popover_menu_get_menu_model(GTK_POPOVER_MENU(popover));
+    if (!controls || !model || !has_action(model, expected, 0))
+        return;
+    g_autoptr(GObject) slot = NULL;
+    g_autoptr(GFile) location = NULL;
+    g_object_get(controls, "window-slot", &slot, NULL);
+    if (slot)
+        g_object_get(slot, "location", &location, NULL);
+    if (!location)
+        return;
+    HistoryContext *context = g_new0(HistoryContext, 1);
+    g_weak_ref_init(&context->controls, controls);
+    g_weak_ref_init(&context->slot, slot);
+    context->location = g_object_ref(location);
+    context->model = g_object_ref(model);
+    context->token = ++next_history_token;
+    // Replacing a popup snapshot retires all previous aliases immediately.
+    g_object_set_data_full(G_OBJECT(popover), HISTORY_KEY, context, history_free);
+    context->controls_signal = g_signal_connect(controls, "notify::window-slot", G_CALLBACK(history_changed), popover);
+    context->slot_signal = g_signal_connect(slot, "notify::location", G_CALLBACK(history_changed), popover);
+}
+
+static void append_files_menu(GMenu *root, const char *caption, GMenuModel *model)
+{
+    g_autoptr(GMenuItem) item = g_menu_item_new_submenu(caption, model);
+    g_menu_item_set_attribute(item, "x-gnomenu-layout", "s", "files");
+    g_menu_append_item(root, item);
+}
+
+static void collect_history_menu(WindowExport *export, GtkWidget *window, GtkPopover *popover,
+                                  GMenu *root, GString *signature)
+{
+    HistoryContext *context = g_object_get_data(G_OBJECT(popover), HISTORY_KEY);
+    if (!context || !history_valid(popover, context->token))
+        return;
+    GtkWidget *button = gtk_widget_get_parent(GTK_WIDGET(popover));
+    const char *caption = gtk_widget_get_tooltip_text(button);
+    export->copying_history = popover;
+    export->copying_history_token = context->token;
+    g_string_append_printf(signature, "history=%u/%s;", context->token, caption);
+    g_autoptr(GMenu) copy = copy_menu(export, window, button, GTK_WIDGET(popover), context->model, signature, 0);
+    export->copying_history = NULL;
+    // These are native named menus, not toolbar wrappers to redistribute.
+    g_menu_append_submenu(root, caption, G_MENU_MODEL(copy));
+}
+
 void gtk_popover_popup(GtkPopover *popover)
 {
     static void (*original)(GtkPopover *);
@@ -696,6 +830,8 @@ void gtk_popover_popup(GtkPopover *popover)
     original(popover);
     if (enabled)
         capture_file_popup(popover);
+    if (enabled)
+        capture_history_popup(popover);
     if (enabled && is_breadcrumb_popover(popover)) {
         BreadcrumbContext *context = g_object_get_data(G_OBJECT(popover), BREADCRUMB_KEY);
         if (context)
@@ -722,7 +858,7 @@ static void collect_breadcrumb_menu(WindowExport *export, GtkWidget *window, Gtk
     export->copying_breadcrumb = NULL;
     g_auto(GStrv) parts = g_strsplit(title, "_", -1);
     g_autofree char *caption = g_strjoinv("__", parts);
-    g_menu_append_submenu(root, caption, G_MENU_MODEL(copy));
+    append_files_menu(root, caption, G_MENU_MODEL(copy));
 }
 
 static void collect_tab_menu(WindowExport *export, GtkWidget *window, GtkWidget *view,
@@ -770,7 +906,7 @@ static void collect_tab_menu(WindowExport *export, GtkWidget *window, GtkWidget 
     // GMenu labels use mnemonic underscores; tab titles are literal filenames.
     g_auto(GStrv) title_parts = g_strsplit(title, "_", -1);
     g_autofree char *menu_title = g_strjoinv("__", title_parts);
-    g_menu_append_submenu(root, menu_title, G_MENU_MODEL(copy));
+    append_files_menu(root, menu_title, G_MENU_MODEL(copy));
 }
 
 static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *widget,
@@ -784,6 +920,8 @@ static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *wi
         return;
     if (GTK_IS_POPOVER_MENU(widget))
         collect_file_popup(export, window, GTK_POPOVER(widget), root, signature);
+    if (GTK_IS_POPOVER_MENU(widget))
+        collect_history_menu(export, window, GTK_POPOVER(widget), root, signature);
     if (GTK_IS_POPOVER_MENU(widget) && is_breadcrumb_popover(GTK_POPOVER(widget)))
         collect_breadcrumb_menu(export, window, GTK_POPOVER(widget), root, signature);
     if (g_str_equal(G_OBJECT_TYPE_NAME(widget), "AdwTabView"))
@@ -813,7 +951,7 @@ static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *wi
                 if (!(export->menu_kinds & kind)) {
                     g_autoptr(GMenu) copy = copy_menu(export, window, widget, GTK_WIDGET(popover), model, signature, 0);
                     g_string_append_printf(signature, "menu=%s;", caption);
-                    g_menu_append_submenu(root, caption, G_MENU_MODEL(copy));
+                    append_files_menu(root, caption, G_MENU_MODEL(copy));
                     export->menu_kinds |= kind;
                     export->menus++;
                 }
@@ -895,7 +1033,6 @@ static gboolean scan(gpointer data)
             g_menu_remove_all(shared_root);
             for (gint item = 0; item < g_menu_model_get_n_items(G_MENU_MODEL(export->model)); item++) {
                 g_autoptr(GMenuItem) copy = g_menu_item_new_from_model(G_MENU_MODEL(export->model), item);
-                g_menu_item_set_attribute(copy, "x-gnomenu-layout", "s", "files");
                 g_menu_append_item(shared_root, copy);
             }
         }

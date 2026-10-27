@@ -51,6 +51,7 @@ report = {
         'Breadcrumb checks cover background-tab opening and replacement of a clicked target in the private 1100px layout; New Window, Properties and click-to-retirement races remain unverified.',
         'File-context checks cover background Select All, opening one/two selected folders and retiring stale selection aliases in a fixed private list layout.',
         'Native Copy/Paste, Cut/Paste and single-folder Rename are verified with exact marker contents in private temporary directories; other clipboard formats, file types and batch rename remain unverified.',
+        'Actual Back/Forward history popups retain native captions and uint32 targets; navigation, popup replacement and active-tab changes retire their scoped aliases. Other private widget menus and broad history/loading races remain unverified.',
         'Selection snapshots use the documented source contract of Nautilus 50.4 GObject properties and are limited to 128 selected objects; other versions and large selections need separate validation.',
     ],
 }
