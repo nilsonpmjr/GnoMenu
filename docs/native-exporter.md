@@ -45,24 +45,31 @@ The harness creates a private bus, compositor, settings and temporary folders. I
 
 The prototype polls native models and states every 200 ms. It copies models without modifying their original contents. A structural change updates the shared menubar model; switching the active application window changes which native models supply that container.
 
+The second iteration handles the header and bottom-bar instances of View Options as two native controls for one exported menu. A newly encountered responsive control joins the existing capture immediately. Generated GTK menubar widgets are excluded from discovery. Forwarding actions are replaced if their original parameter or state type changes, and an empty native model clears its previous export instead of leaving a stale menu.
+
 ## Local controls
 
-When both supported menus have resolved their actions and custom slots, the library exposes a boolean `win.show-menubar` action. GnoMenu's existing capture lifecycle uses it to hide those two original menu buttons. The original visibility flags are restored when capture ends or the extension is disabled. Other toolbar controls and uncaptured context menus remain available.
+When both supported menus have resolved their actions and custom slots, the library exposes a boolean `win.show-menubar` action. GnoMenu's existing capture lifecycle uses it to hide the original menu buttons, including a responsive duplicate when present. The original visibility flags are restored when capture ends or the extension is disabled. Other toolbar controls and uncaptured context menus remain available.
 
 The test checks restoration across two windows and extension disable. This is not a general mechanism for hiding arbitrary GTK or Electron UI.
+
+If either supported model disappears or cannot resolve its actions, the exporter restores the captured buttons and withdraws the visibility action. Shell menu bindings are also removed when their actors are destroyed, including during compositor shutdown.
 
 ## Validation and evidence
 
 Observed environment: Nautilus `50.4-1.fc44`, GTK `4.22.5-2.fc44`, GNOME Shell `50.6-1.fc44`, Wayland on Bazzite 44.
 
-Eight check groups passed across the two locale sessions:
+Fourteen check groups cover the two locale sessions:
 
 - Original Main Menu/View Options models, native custom zoom entries and tuple targets are imported.
 - Show Hidden Files reveals a real hidden test file. Nautilus intentionally shares this preference across its windows; the exporter preserves that behavior.
 - A typed sort command changes the selected window's action state while the second directory window retains its previous state. The original state is restored afterward.
+- Three cycles of creating and closing a native tab keep Show Hidden Files connected to the current view, verified against the actual hidden file.
+- Resizing to narrow and wide layouts preserves working commands without duplicate headings.
+- Native keyboard shortcuts switch between list and grid views. The imported menu follows the native Visible Columns/Captions availability, and hidden-file commands continue to work.
 - Original local menu controls return when focus changes to the other window and when GnoMenu is disabled.
 
-The regular 101 check groups also passed without loading the optional library. The extension ZIP's runtime remains unchanged by this experiment.
+The regular 101 check groups also passed without loading the optional library. The extension ZIP includes the Shell actor-lifetime cleanup fix; the native library remains outside the ZIP and normal installation.
 
 Local artifacts:
 
@@ -73,15 +80,16 @@ Local artifacts:
 - `reports/dev-session/real-apps/native-exporter/native-controls-restored.png`: controls after disable.
 - `reports/rea-native-exporter.json`: retained REA controlled-replay evidence.
 
-REA runtime evidence: `ev_40709176699fc0689d1ef71cd644ee3b97fb9f0953b060cb8653e9b7484ae049`, observed controlled replay, exit code 0. The process sampler reached its selected limit and could not inspect some other processes; its process-tree coverage is partial. Its root process group cleanup was verified. The capture does not observe network activity or establish an atomic executable-image binding. The test report and screenshots are evidence for the declared checks, not proof of general compatibility or system-wide behavior.
+First-iteration REA runtime evidence: `ev_40709176699fc0689d1ef71cd644ee3b97fb9f0953b060cb8653e9b7484ae049`, observed controlled replay, exit code 0. This record covers the original eight groups, not the second iteration's expanded checks. The current local verifier records its own source/library hashes and results in `reports/native-exporter.json`. The REA process sampler reached its selected limit and could not inspect some other processes; its process-tree coverage is partial. Its root process group cleanup was verified. The capture does not observe network activity or establish an atomic executable-image binding. The test report and screenshots are evidence for the declared checks, not proof of general compatibility or system-wide behavior.
 
 REA static evidence: `ev_2820ecf786e0d1826f0ea9d3cda77d7eeb00642a5503f44e59624954554f0a53`, with selected export-table view `ev_0e7b92b550e8e288441ea626c1f9fda7f10928cb1b17cf601f45db678d8ef615`. This establishes that the installed GTK binary exports the selected public functions. It does not establish runtime reachability on its own.
 
 ## Remaining work
 
 - Capture tab, pathbar, background and selection context menus with their real context and action targets.
-- Validate tab changes, navigation, view-mode changes, resizing and responsive layouts under repeated use.
-- Harden action type changes, model lifetimes and live replacement beyond the validated cases.
+- Extend the bounded tab, view-mode and responsive-layout checks to navigation, background/foreground transitions and long-running stress.
+- Exercise parameter/state type replacement with dedicated changing-type fixtures; the replacement guard is implemented but the real-app checks do not force Nautilus to change an action's type.
+- Harden model lifetimes and live replacement beyond the validated cases, including disappearance of entire supported menus.
 - Define installation, launch and recovery for regular desktop use; current support is the private harness.
 - Investigate Flatpak loading and runtime dependencies separately.
 - Validate accessibility, keyboard/pointer interaction and additional Nautilus/GTK versions.

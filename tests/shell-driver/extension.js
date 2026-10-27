@@ -139,6 +139,71 @@ export default class ShellTestDriver extends Extension {
         firstGroup.activate_action('gnomenu.view.sort', originalSort);
         await waitFor(() => firstGroup.get_action_state('gnomenu.view.sort').equal(originalSort), 'restore original sort');
         passed.push('Original tuple sort targets reach the correct Files window and native state can be restored');
+        const waitTabs = async expected => {
+            const deadline = GLib.get_monotonic_time() + 8000000;
+            while (GLib.get_monotonic_time() < deadline) {
+                const state = await observe(windows[0]);
+                // Nautilus removes the tab bar when only one page remains.
+                if (state.found && (expected === 1 ? state.visibleTabEntries <= 1 : state.visibleTabEntries === expected))
+                    return;
+            }
+            throw new Error(`Files did not expose ${expected} actual tabs`);
+        };
+        for (let cycle = 0; cycle < 3; cycle++) {
+            binding('win.new-tab').actor.activate(null);
+            await waitTabs(2);
+            await waitFor(() => binding('win.gnomenu.view.show-hidden-files')?.actor.sensitive,
+                'new tab supplies its current widget actions');
+            binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
+            await waitHidden(windows[0], true);
+            firstGroup.activate_action('close-current-view', null);
+            await waitTabs(1);
+            await waitFor(() => binding('win.gnomenu.view.show-hidden-files')?.actor._menuLabNode.toggle.checked,
+                'remaining tab supplies the shared native preference');
+            binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
+            await waitHidden(windows[0], false);
+        }
+        passed.push('Repeated native tab creation and destruction keep commands bound to the live view');
+        const rectangle = windows[0].get_frame_rect();
+        for (const width of [520, 1100, rectangle.width]) {
+            windows[0].move_resize_frame(false, rectangle.x, rectangle.y, width, rectangle.height);
+            await waitFor(() => Math.abs(windows[0].get_frame_rect().width - width) < 20,
+                'Files resize completes');
+            binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
+            await waitHidden(windows[0], true);
+            binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
+            await waitHidden(windows[0], false);
+            assert(extension._buttons.length === 3, 'Responsive layout must not duplicate imported menus');
+        }
+        passed.push('Narrow and wide Files layouts retain working imported commands without duplicate menus');
+        const keyboard = global.stage.context.get_backend().get_default_seat()
+            .create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        const pointer = global.stage.context.get_backend().get_default_seat()
+            .create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        const viewMode = async (symbol, action) => {
+            await select(windows[0]);
+            const frame = windows[0].get_frame_rect();
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), frame.x + frame.width / 2,
+                frame.y + frame.height * 0.75);
+            pointer.notify_button(GLib.get_monotonic_time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+            pointer.notify_button(GLib.get_monotonic_time() + 1000, Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+            await waitFor(() => global.display.focus_window === windows[0], 'Files receives keyboard focus');
+            const time = GLib.get_monotonic_time();
+            keyboard.notify_keyval(time, Clutter.KEY_Control_L, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time + 1000, symbol, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time + 2000, symbol, Clutter.KeyState.RELEASED);
+            keyboard.notify_keyval(time + 3000, Clutter.KEY_Control_L, Clutter.KeyState.RELEASED);
+            await waitFor(() => binding(action)?.actor.sensitive, 'native view mode updates menu entries');
+            binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
+            await waitHidden(windows[0], true);
+            binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
+            await waitHidden(windows[0], false);
+        };
+        await viewMode(Clutter.KEY_1, 'win.gnomenu.view.visible-columns');
+        assert(!binding('win.gnomenu.view.visible-captions'), 'List view must hide native grid-only commands');
+        await viewMode(Clutter.KEY_2, 'win.gnomenu.view.visible-captions');
+        assert(!binding('win.gnomenu.view.visible-columns'), 'Grid view must hide native list-only commands');
+        passed.push('Real keyboard view-mode changes replace native menu entries and preserve live widget commands');
         const directory = GLib.path_get_dirname(GLib.getenv('GNOMENU_REPORT'));
         GLib.file_set_contents(GLib.build_filenamev([directory, 'native-model.json']), JSON.stringify({
             headings: extension._buttons.map(button => button.get_first_child().text),
@@ -166,7 +231,7 @@ export default class ShellTestDriver extends Extension {
         await capture('native-main-menu.png');
         menuFor('app.preferences').close(0);
         await Main.extensionManager.disableExtension(UUID);
-        await waitFor(() => firstGroup.get_action_state('show-menubar').unpack() && extension._buttons.length === 0,
+        await waitFor(() => firstGroup.get_action_state('show-menubar')?.unpack() && extension._buttons.length === 0,
             'disable restores the original controls');
         await capture('native-controls-restored.png');
         passed.push('Switching windows and disabling the extension restore the original native menu controls');

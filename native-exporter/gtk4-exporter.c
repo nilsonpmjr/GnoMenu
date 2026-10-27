@@ -30,6 +30,7 @@ typedef struct {
     GSimpleAction *visibility;
     guint generation;
     guint menus;
+    guint menu_kinds;
     guint issues;
     guint remaining;
 } WindowExport;
@@ -178,6 +179,9 @@ static void remember_button(WindowExport *export, GtkWidget *widget)
     g_weak_ref_init(&button->widget, widget);
     button->visible = gtk_widget_get_visible(widget);
     g_ptr_array_add(export->buttons, button);
+    g_autoptr(GVariant) state = export->visibility ? g_action_get_state(G_ACTION(export->visibility)) : NULL;
+    if (state && !g_variant_get_boolean(state))
+        gtk_widget_set_visible(widget, FALSE);
 }
 
 static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *origin, const char *full)
@@ -195,11 +199,25 @@ static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *orig
     g_autofree char *local = g_strconcat("gnomenu.", full, NULL);
     Proxy *proxy = g_hash_table_lookup(export->proxies, local);
     const GVariantType *parameter = g_action_group_get_action_parameter_type(group, name);
+    g_autoptr(GVariant) state = g_action_group_get_action_state(group, name);
+    if (proxy) {
+        const GVariantType *old_parameter = g_action_get_parameter_type(G_ACTION(proxy->action));
+        const GVariantType *old_state = g_action_get_state_type(G_ACTION(proxy->action));
+        const GVariantType *new_state = state ? g_variant_get_type(state) : NULL;
+        if ((parameter == NULL) != (old_parameter == NULL) ||
+            (parameter && old_parameter && !g_variant_type_equal(parameter, old_parameter)) ||
+            (new_state == NULL) != (old_state == NULL) ||
+            (new_state && old_state && !g_variant_type_equal(new_state, old_state))) {
+            // GSimpleAction types are immutable: replace, never keep a stale contract.
+            g_action_map_remove_action(G_ACTION_MAP(window), local);
+            g_hash_table_remove(export->proxies, local);
+            proxy = NULL;
+        }
+    }
     if (!proxy) {
         proxy = g_new0(Proxy, 1);
         g_weak_ref_init(&proxy->origin, origin);
         proxy->original = g_strdup(full);
-        g_autoptr(GVariant) state = g_action_group_get_action_state(group, name);
         proxy->action = state ? g_simple_action_new_stateful(local, parameter, state) :
             g_simple_action_new(local, parameter);
         g_signal_connect(proxy->action, "activate", G_CALLBACK(proxy_activate), proxy);
@@ -210,7 +228,6 @@ static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *orig
     proxy->seen = export->generation;
     g_weak_ref_set(&proxy->origin, origin);
     g_simple_action_set_enabled(proxy->action, g_action_group_get_action_enabled(group, name));
-    g_autoptr(GVariant) state = g_action_group_get_action_state(group, name);
     const GVariantType *state_type = g_action_get_state_type(G_ACTION(proxy->action));
     if (state && state_type && g_variant_is_of_type(state, state_type))
         g_simple_action_set_state(proxy->action, state);
@@ -323,6 +340,10 @@ static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *wi
 {
     if (depth > 40)
         return;
+    // GTK may render our exported menubar itself after responsive layout changes.
+    // Its generated buttons are consumers, never additional native sources.
+    if (GTK_IS_POPOVER_MENU_BAR(widget))
+        return;
     gboolean captured = FALSE;
     for (guint i = 0; i < export->buttons->len; i++) {
         Button *button = g_ptr_array_index(export->buttons, i);
@@ -335,14 +356,21 @@ static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *wi
         GMenuModel *model = gtk_menu_button_get_menu_model(GTK_MENU_BUTTON(widget));
         if (!model && GTK_IS_POPOVER_MENU(popover))
             model = gtk_popover_menu_get_menu_model(GTK_POPOVER_MENU(popover));
-        if (model && (has_action(model, "app.clone-window", 0) || has_action(model, "view.show-hidden-files", 0))) {
+        guint kind = !model ? 0 : has_action(model, "app.clone-window", 0) ? 1 :
+            has_action(model, "view.show-hidden-files", 0) ? 2 : 0;
+        if (kind) {
             const char *caption = gtk_widget_get_tooltip_text(widget);
             if (caption && *caption) {
-                g_autoptr(GMenu) copy = copy_menu(export, window, widget, GTK_WIDGET(popover), model, signature, 0);
-                g_string_append_printf(signature, "menu=%s;", caption);
-                g_menu_append_submenu(root, caption, G_MENU_MODEL(copy));
+                // Nautilus has header and bottom-bar View Options controls for
+                // responsive layouts. Own both originals, publish the menu once.
                 remember_button(export, widget);
-                export->menus++;
+                if (!(export->menu_kinds & kind)) {
+                    g_autoptr(GMenu) copy = copy_menu(export, window, widget, GTK_WIDGET(popover), model, signature, 0);
+                    g_string_append_printf(signature, "menu=%s;", caption);
+                    g_menu_append_submenu(root, caption, G_MENU_MODEL(copy));
+                    export->menu_kinds |= kind;
+                    export->menus++;
+                }
             } else {
                 export->issues++;
             }
@@ -374,7 +402,7 @@ static gboolean scan(gpointer data)
             g_object_set_data_full(G_OBJECT(window), WINDOW_KEY, export, window_free);
         }
         export->generation++;
-        export->menus = export->issues = 0;
+        export->menus = export->issues = export->menu_kinds = 0;
         export->remaining = 512;
         g_autoptr(GMenu) root = g_menu_new();
         g_autoptr(GString) signature = g_string_new(NULL);
@@ -389,7 +417,7 @@ static gboolean scan(gpointer data)
                 g_hash_table_iter_remove(&iter);
             }
         }
-        if (export->menus && g_strcmp0(export->signature, signature->str) != 0) {
+        if (g_strcmp0(export->signature, signature->str) != 0) {
             g_set_object(&export->model, root);
             g_free(export->signature);
             export->signature = g_strdup(signature->str);
@@ -403,9 +431,10 @@ static gboolean scan(gpointer data)
             g_signal_connect(export->visibility, "change-state", G_CALLBACK(visibility_changed), export);
             g_action_map_add_action(G_ACTION_MAP(window), G_ACTION(export->visibility));
         }
-        if (export->visibility && export->issues) {
+        if (export->visibility && (export->issues || export->menus != 2)) {
             g_action_group_change_action_state(G_ACTION_GROUP(window), "show-menubar", g_variant_new_boolean(TRUE));
             g_action_map_remove_action(G_ACTION_MAP(window), "show-menubar");
+            g_signal_handlers_disconnect_by_data(export->visibility, export);
             g_clear_object(&export->visibility);
         }
         GMenu *shared_root = g_object_get_data(G_OBJECT(app), "gnomenu-root");

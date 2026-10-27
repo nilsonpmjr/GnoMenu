@@ -37,7 +37,8 @@ report = {
     'cases': cases,
     'limits': [
         'Only the actual Main Menu and View Options models of Nautilus 50.4 are captured.',
-        'Context menus, generic widget-class actions, layout changes and Flatpak loading are not validated.',
+        'Context menus, generic widget-class actions, long-running layout stress and Flatpak loading are not validated.',
+        'Tab cycles, narrow/wide resizing and grid/list changes cover the declared Nautilus version only.',
         'The optional library is loaded into test Nautilus processes only; it is outside the extension ZIP.',
         'Show Hidden Files preserves the native shared preference; sort targets are checked on two separate windows.',
     ],

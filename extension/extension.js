@@ -305,7 +305,11 @@ export default class GnoMenu extends Extension {
                 item.connect('activate', () => source?.activate(item._menuLabNode));
             }
             menu.addMenuItem(item);
-            this._bindings.push({id: node.id, actor: item});
+            const binding = {id: node.id, actor: item};
+            this._bindings.push(binding);
+            item.connect('destroy', () => {
+                this._bindings = this._bindings.filter(entry => entry !== binding);
+            });
         }
     }
 
@@ -334,10 +338,11 @@ export default class GnoMenu extends Extension {
     }
 
     _clearButtons() {
-        for (const button of this._buttons)
-            button.destroy();
+        const buttons = this._buttons;
         this._buttons = [];
         this._bindings = [];
+        for (const button of buttons)
+            button.destroy();
     }
 
 }
