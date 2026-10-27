@@ -373,6 +373,83 @@ export default class ShellTestDriver extends Extension {
             'A retired alias must not close a replacement tab');
         passed.push('Right-clicked inactive tab remains the command target after popup close; retired aliases are withdrawn');
         windows[0].move_resize_frame(false, tabFrame.x, tabFrame.y, tabFrame.width, tabFrame.height);
+        windows[0].move_resize_frame(false, 20, tabFrame.y, 1100, tabFrame.height);
+        await waitFor(() => Math.abs(windows[0].get_frame_rect().width - 1100) < 20,
+            'private wide breadcrumb layout');
+        await capture('native-breadcrumbs-before-context.png');
+        const breadcrumbCommand = name => extension._bindings.find(entry => {
+            const action = entry.actor._menuLabNode?.action;
+            return action?.startsWith('win.gnomenu.pathbar.') && action.endsWith(`.${name}`);
+        });
+        const rightClickPath = async offset => {
+            const frame = windows[0].get_frame_rect();
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), frame.x + offset, frame.y + 23);
+            pointer.notify_button(GLib.get_monotonic_time(), Clutter.BUTTON_SECONDARY, Clutter.ButtonState.PRESSED);
+            pointer.notify_button(GLib.get_monotonic_time() + 1000, Clutter.BUTTON_SECONDARY, Clutter.ButtonState.RELEASED);
+        };
+        const escape = () => {
+            keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Escape, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(GLib.get_monotonic_time() + 1000, Clutter.KEY_Escape, Clutter.KeyState.RELEASED);
+        };
+        const dismissBreadcrumbPopup = async () => {
+            escape();
+            // A synthetic panel open can retain Shell keyboard focus, so use
+            // a real outside click to dismiss any remaining native popup grab.
+            const frame = windows[0].get_frame_rect();
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), frame.x + frame.width / 2,
+                frame.y + frame.height * 0.75);
+            pointer.notify_button(GLib.get_monotonic_time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+            pointer.notify_button(GLib.get_monotonic_time() + 1000, Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+            await observe(windows[0]);
+        };
+        // These pointer offsets are specific to this private 1100px GTK layout.
+        await rightClickPath(640);
+        await waitFor(() => breadcrumbCommand('open-item-new-tab')?.actor.sensitive &&
+            extension._buttons.some(button => button.get_first_child().text === currentDirectory.get_basename() &&
+                button.menu.actor.contains(breadcrumbCommand('open-item-new-tab').actor)),
+        'actual parent breadcrumb context is captured with its native folder title');
+        await dismissBreadcrumbPopup();
+        const breadcrumbMenu = extension._buttons.find(button =>
+            button.menu.actor.contains(breadcrumbCommand('open-item-new-tab').actor)).menu;
+        breadcrumbMenu.open(0);
+        await capture('native-breadcrumbs.png');
+        const oldBreadcrumbAlias = breadcrumbCommand('open-item-new-tab').actor._menuLabNode.action.slice(4);
+        GLib.file_set_contents(GLib.build_filenamev([directory, 'native-breadcrumbs-model.json']), JSON.stringify({
+            activeDirectory: windows[0].title,
+            targetDirectory: currentDirectory.get_basename(),
+            windowPath: extension._source.descriptor.windowPath,
+            busOwner: extension._source.descriptor.busName,
+            actions: extension._bindings.filter(entry =>
+                entry.actor._menuLabNode?.action?.startsWith('win.gnomenu.pathbar.')).map(entry => ({
+                label: entry.actor.label?.text, action: entry.actor._menuLabNode.action,
+            })),
+        }, null, 2));
+        breadcrumbMenu.close(0);
+        breadcrumbCommand('open-item-new-tab').actor.activate(null);
+        await waitTabs(2);
+        await waitTabDetails(tabs => tabs.some(tab => tab.name === currentDirectory.get_basename()));
+        assert(windows[0].title === createdName, 'Native Open in New Tab must preserve the active child directory');
+        passed.push('Original breadcrumb menu opens the clicked parent in a real background tab and preserves the active child');
+        const workspaceName = Gio.File.new_for_path(GLib.getenv('GNOMENU_TEST_WORKSPACE')).get_basename();
+        await rightClickPath(526);
+        await observe(windows[0]);
+        await waitFor(() => breadcrumbCommand('open-item-new-tab')?.actor.sensitive &&
+            breadcrumbCommand('open-item-new-tab').actor._menuLabNode.action.slice(4) !== oldBreadcrumbAlias &&
+            extension._buttons.some(button => button.get_first_child().text === workspaceName &&
+                button.menu.actor.contains(breadcrumbCommand('open-item-new-tab').actor)),
+        'a new ancestor click replaces the breadcrumb action context');
+        await dismissBreadcrumbPopup();
+        await waitFor(() => !firstGroup.has_action(oldBreadcrumbAlias), 'previous breadcrumb aliases are retired');
+        firstGroup.activate_action(oldBreadcrumbAlias, null);
+        const afterOldBreadcrumb = await observe(windows[0]);
+        assert(afterOldBreadcrumb.visibleTabEntries === 2, 'Retired breadcrumb action must not open the new target');
+        breadcrumbCommand('open-item-new-tab').actor.activate(null);
+        await waitTabs(3);
+        await waitTabDetails(tabs => tabs.some(tab => tab.name === workspaceName));
+        assert(windows[0].title === createdName, 'Changing breadcrumb context must preserve the active directory');
+        firstGroup.activate_action('close-other-tabs', null);
+        await waitTabs(1);
+        passed.push('Changing breadcrumb targets retires the previous aliases without redirecting stale commands');
         GLib.file_set_contents(GLib.build_filenamev([directory, 'native-model.json']), JSON.stringify({
             headings: extension._buttons.map(button => button.get_first_child().text),
             menuPath: extension._source.descriptor.menuPath,

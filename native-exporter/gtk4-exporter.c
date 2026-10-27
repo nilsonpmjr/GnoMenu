@@ -13,11 +13,20 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(GActionGroup, g_object_unref)
 #define VIEW_MENU 2u
 #define FOLDER_MENU 4u
 #define REQUIRED_MENUS (MAIN_MENU | VIEW_MENU | FOLDER_MENU)
+#define BREADCRUMB_KEY "gnomenu-breadcrumb-context"
+
+typedef struct {
+    GWeakRef button;
+    guint token;
+    gboolean ready;
+} BreadcrumbContext;
 
 typedef struct {
     GWeakRef origin;
     GWeakRef tab_view;
     GWeakRef tab_page;
+    GWeakRef breadcrumb;
+    guint breadcrumb_token;
     char *original;
     GSimpleAction *action;
     guint seen;
@@ -42,6 +51,8 @@ typedef struct {
     GtkWidget *copying_tab_view;
     GObject *copying_tab_page;
     guint copying_tab_token;
+    GtkPopover *copying_breadcrumb;
+    guint copying_breadcrumb_token;
 } WindowExport;
 
 typedef struct {
@@ -51,6 +62,16 @@ typedef struct {
 } TabContext;
 
 static guint next_tab_token;
+static guint next_breadcrumb_token;
+
+static gboolean breadcrumb_valid(GtkPopover *popover, guint token)
+{
+    BreadcrumbContext *context = g_object_get_data(G_OBJECT(popover), BREADCRUMB_KEY);
+    g_autoptr(GtkWidget) button = context ? g_weak_ref_get(&context->button) : NULL;
+    GtkWidget *bar = gtk_widget_get_parent(GTK_WIDGET(popover));
+    return context && context->ready && context->token == token && button && bar &&
+        gtk_widget_is_ancestor(button, bar) && gtk_widget_get_mapped(button);
+}
 
 static void tab_context_free(gpointer data)
 {
@@ -178,6 +199,9 @@ static void proxy_activate(GSimpleAction *action, GVariant *target, gpointer dat
     g_autoptr(GtkWidget) origin = g_weak_ref_get(&proxy->origin);
     g_autoptr(GtkWidget) tab_view = g_weak_ref_get(&proxy->tab_view);
     g_autoptr(GObject) tab_page = g_weak_ref_get(&proxy->tab_page);
+    g_autoptr(GtkPopover) breadcrumb = g_weak_ref_get(&proxy->breadcrumb);
+    if (proxy->breadcrumb_token && (!breadcrumb || !breadcrumb_valid(breadcrumb, proxy->breadcrumb_token)))
+        return;
     if (g_str_has_prefix(g_action_get_name(G_ACTION(action)), "gnomenu.tab.") &&
         (!tab_view || !tab_page || !tab_contains(tab_view, tab_page)))
         return;
@@ -215,6 +239,7 @@ static void proxy_free(gpointer data)
     g_weak_ref_clear(&proxy->origin);
     g_weak_ref_clear(&proxy->tab_view);
     g_weak_ref_clear(&proxy->tab_page);
+    g_weak_ref_clear(&proxy->breadcrumb);
     g_free(proxy->original);
     g_free(proxy);
 }
@@ -282,7 +307,9 @@ static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *orig
             g_printerr("GNOMENU_UNRESOLVED action=%s origin=%s\n", full, G_OBJECT_TYPE_NAME(origin));
         return g_strdup(full);
     }
+    gboolean breadcrumb_action = export->copying_breadcrumb && g_str_has_prefix(full, "pathbar.");
     g_autofree char *local = tab_action ? g_strdup_printf("gnomenu.tab.%u.%s", export->copying_tab_token, name) :
+        breadcrumb_action ? g_strdup_printf("gnomenu.pathbar.%u.%s", export->copying_breadcrumb_token, name) :
         g_strconcat("gnomenu.", full, NULL);
     Proxy *proxy = g_hash_table_lookup(export->proxies, local);
     const GVariantType *parameter = g_action_group_get_action_parameter_type(group, name);
@@ -306,6 +333,8 @@ static char *proxy_name(WindowExport *export, GtkWidget *window, GtkWidget *orig
         g_weak_ref_init(&proxy->origin, origin);
         g_weak_ref_init(&proxy->tab_view, tab_action ? export->copying_tab_view : NULL);
         g_weak_ref_init(&proxy->tab_page, tab_action ? export->copying_tab_page : NULL);
+        g_weak_ref_init(&proxy->breadcrumb, breadcrumb_action ? export->copying_breadcrumb : NULL);
+        proxy->breadcrumb_token = breadcrumb_action ? export->copying_breadcrumb_token : 0;
         proxy->original = g_strdup(full);
         proxy->action = state ? g_simple_action_new_stateful(local, parameter, state) :
             g_simple_action_new(local, parameter);
@@ -424,6 +453,98 @@ static gboolean has_action(GMenuModel *model, const char *action, guint depth)
     return FALSE;
 }
 
+static gboolean is_breadcrumb_popover(GtkPopover *popover)
+{
+    GtkWidget *bar = gtk_widget_get_parent(GTK_WIDGET(popover));
+    GMenuModel *model = GTK_IS_POPOVER_MENU(popover) ?
+        gtk_popover_menu_get_menu_model(GTK_POPOVER_MENU(popover)) : NULL;
+    return bar && g_str_equal(G_OBJECT_TYPE_NAME(bar), "NautilusPathBar") && model &&
+        has_action(model, "pathbar.open-item-new-tab", 0) && has_action(model, "pathbar.properties", 0);
+}
+
+static void breadcrumb_free(gpointer data)
+{
+    BreadcrumbContext *context = data;
+    g_weak_ref_clear(&context->button);
+    g_free(context);
+}
+
+static GtkWidget *breadcrumb_at(GtkWidget *widget, GtkWidget *bar, const graphene_point_t *point)
+{
+    if (GTK_IS_BUTTON(widget) && gtk_widget_has_css_class(widget, "nautilus-path-button")) {
+        graphene_rect_t bounds;
+        if (gtk_widget_compute_bounds(widget, bar, &bounds) && graphene_rect_contains_point(&bounds, point))
+            return widget;
+    }
+    // Popovers belong to the pathbar too, but are never breadcrumb buttons.
+    if (GTK_IS_POPOVER(widget))
+        return NULL;
+    for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child)) {
+        GtkWidget *found = breadcrumb_at(child, bar, point);
+        if (found)
+            return found;
+    }
+    return NULL;
+}
+
+void gtk_popover_set_pointing_to(GtkPopover *popover, const GdkRectangle *rectangle)
+{
+    static void (*original)(GtkPopover *, const GdkRectangle *);
+    if (!original)
+        original = dlsym(RTLD_NEXT, "gtk_popover_set_pointing_to");
+    if (enabled && is_breadcrumb_popover(popover)) {
+        BreadcrumbContext *context = g_object_get_data(G_OBJECT(popover), BREADCRUMB_KEY);
+        if (!context) {
+            context = g_new0(BreadcrumbContext, 1);
+            g_weak_ref_init(&context->button, NULL);
+            g_object_set_data_full(G_OBJECT(popover), BREADCRUMB_KEY, context, breadcrumb_free);
+        }
+        // Nautilus changes its private context after this call, potentially
+        // waiting for file metadata. Retire the previous aliases immediately.
+        context->ready = FALSE;
+        context->token = ++next_breadcrumb_token;
+        GtkWidget *bar = gtk_widget_get_parent(GTK_WIDGET(popover));
+        graphene_point_t point = GRAPHENE_POINT_INIT(rectangle ? rectangle->x : -1, rectangle ? rectangle->y : -1);
+        g_weak_ref_set(&context->button, rectangle ? breadcrumb_at(bar, bar, &point) : NULL);
+    }
+    original(popover, rectangle);
+}
+
+void gtk_popover_popup(GtkPopover *popover)
+{
+    static void (*original)(GtkPopover *);
+    if (!original)
+        original = dlsym(RTLD_NEXT, "gtk_popover_popup");
+    original(popover);
+    if (enabled && is_breadcrumb_popover(popover)) {
+        BreadcrumbContext *context = g_object_get_data(G_OBJECT(popover), BREADCRUMB_KEY);
+        if (context)
+            context->ready = TRUE;
+    }
+}
+
+static void collect_breadcrumb_menu(WindowExport *export, GtkWidget *window, GtkPopover *popover,
+                                    GMenu *root, GString *signature)
+{
+    BreadcrumbContext *context = g_object_get_data(G_OBJECT(popover), BREADCRUMB_KEY);
+    if (!context || !breadcrumb_valid(popover, context->token))
+        return;
+    g_autoptr(GtkWidget) button = g_weak_ref_get(&context->button);
+    const char *title = gtk_widget_get_tooltip_text(button);
+    if (!title || !*title)
+        return;
+    GtkWidget *bar = gtk_widget_get_parent(GTK_WIDGET(popover));
+    GMenuModel *model = gtk_popover_menu_get_menu_model(GTK_POPOVER_MENU(popover));
+    export->copying_breadcrumb = popover;
+    export->copying_breadcrumb_token = context->token;
+    g_string_append_printf(signature, "breadcrumb=%u/%s;", context->token, title);
+    g_autoptr(GMenu) copy = copy_menu(export, window, bar, GTK_WIDGET(popover), model, signature, 0);
+    export->copying_breadcrumb = NULL;
+    g_auto(GStrv) parts = g_strsplit(title, "_", -1);
+    g_autofree char *caption = g_strjoinv("__", parts);
+    g_menu_append_submenu(root, caption, G_MENU_MODEL(copy));
+}
+
 static void collect_tab_menu(WindowExport *export, GtkWidget *window, GtkWidget *view,
                              GMenu *root, GString *signature)
 {
@@ -481,6 +602,8 @@ static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *wi
     // Its generated buttons are consumers, never additional native sources.
     if (GTK_IS_POPOVER_MENU_BAR(widget))
         return;
+    if (GTK_IS_POPOVER_MENU(widget) && is_breadcrumb_popover(GTK_POPOVER(widget)))
+        collect_breadcrumb_menu(export, window, GTK_POPOVER(widget), root, signature);
     if (g_str_equal(G_OBJECT_TYPE_NAME(widget), "AdwTabView"))
         collect_tab_menu(export, window, widget, root, signature);
     gboolean captured = FALSE;
