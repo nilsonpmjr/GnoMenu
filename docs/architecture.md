@@ -38,6 +38,8 @@ PanelMenu and PopupMenu provide GNOME interaction and accessibility primitives. 
 
 State-only updates refresh the existing actors. Structural changes rebuild the menu while preserving an open menu only for the same source.
 
+Checkbox and radio commands expose their respective ATK menu-item roles. PopupMenu ornaments synchronize the checked accessibility state with the exported action state. These semantics are tested in the private compositor; interaction with a running screen reader still needs manual verification.
+
 ## Localization
 
 The Extension base class initializes the `gnomenu` gettext domain from metadata. Gio-only modules receive a translator function so they remain testable outside the Shell. Exported application labels are never passed through GnoMenu's translator.

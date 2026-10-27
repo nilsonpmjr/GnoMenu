@@ -6,6 +6,7 @@ The long-term goal is broad global-menu support across system applications and c
 
 - Application name first, followed by application menus.
 - Public display name: GnoMenu Global Menu; short brand: GnoMenu.
+- Public GitHub repository, permanent UUID and passing GitHub Actions checks.
 - Native exported GMenu models, sections, nested menus and live action state.
 - Standard exported preferences/about/quit actions as a fallback.
 - Partial action menus for Nautilus 50.4 and Ptyxis 50.1.
@@ -13,12 +14,14 @@ The long-term goal is broad global-menu support across system applications and c
 - Leading-edge dropdown placement, RTL behavior and monitor-edge containment.
 - Session-language inheritance with six gettext catalogs and English fallback.
 - Real Nautilus/Ptyxis checks using two windows per application.
+- Basic keyboard and pointer event tests in the private compositor.
+- Checkbox/radio accessibility roles and checked-state synchronization.
+- Repeated disable/enable checks for source and panel-registration cleanup.
 - DBusMenu transport, registrar and declared-ID discovery in private-bus tests.
 - Runtime-only deterministic ZIP builds, lint and release-package auditing.
 
 ## First public alpha
 
-- Configure the actual public repository URL and permanent controlled UUID namespace.
 - Maintainer review of the shipped code and its lifecycle.
 - Complete the manual keyboard, pointer, accessibility and coexisting-panel checks in the publishing guide.
 - Confirm the release ZIP in a clean GNOME 50 login.

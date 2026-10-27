@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 GnoMenu contributors
 import Gio from 'gi://Gio';
+import Atk from 'gi://Atk';
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
@@ -204,6 +205,10 @@ export default class ShellTestDriver extends Extension {
             'First heading must use desktop app identity, not the window title');
         assert(extension._buttons[1].get_first_child().text === 'Arquivo', 'Mnemonic must be stripped');
         assert(!binding('win.blocked').actor.sensitive, 'Disabled item must be insensitive');
+        assert(binding('win.checked').actor.accessible_role === Atk.Role.CHECK_MENU_ITEM &&
+            binding('win.mode').actor.accessible_role === Atk.Role.RADIO_MENU_ITEM &&
+            binding('win.increment').actor.accessible_role === Atk.Role.MENU_ITEM,
+        'Commands must expose checkbox, radio and ordinary menu-item roles');
         passed.push('Wayland window metadata selects exported menu and renders panel headings');
         await waitFor(() => binding('app.preferences')?.actor.sensitive, 'exported settings action');
         const expectedPreferences = extension.gettext('Preferences…');
@@ -240,6 +245,67 @@ export default class ShellTestDriver extends Extension {
         const first = extension._source;
         const firstGroup = first._groups.get('win');
         await waitFor(() => firstGroup.has_action('counter'), 'first counter');
+        // Inject input only into this harness's private compositor. Exercise
+        // Shell event dispatch rather than emitting actor activation signals.
+        const keyboard = global.stage.context.get_backend().get_default_seat()
+            .create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        const key = symbol => {
+            const time = GLib.get_monotonic_time();
+            keyboard.notify_keyval(time, symbol, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time + 1000, symbol, Clutter.KeyState.RELEASED);
+        };
+        const viewButton = extension._buttons[2];
+        viewButton.grab_key_focus();
+        key(Clutter.KEY_Down);
+        await waitFor(() => viewButton.menu.isOpen, 'Down opens the focused menu');
+        await waitFor(() => global.stage.key_focus === binding('win.checked').actor,
+            'first menu command receives keyboard focus');
+        key(Clutter.KEY_Down);
+        await waitFor(() => global.stage.key_focus === binding('win.mode').actor,
+            'Down moves to the next command');
+        key(Clutter.KEY_Up);
+        await waitFor(() => global.stage.key_focus === binding('win.checked').actor,
+            'Up returns to the checkbox');
+        key(Clutter.KEY_Return);
+        await waitFor(() => firstGroup.get_action_state('checked').unpack() && !viewButton.menu.isOpen,
+            'Return toggles the application action and closes its popup');
+        assert(binding('win.checked').actor.get_accessible().ref_state_set().contains_state(Atk.StateType.CHECKED),
+            'Checkbox activation must expose its checked accessibility state');
+        viewButton.grab_key_focus();
+        key(Clutter.KEY_Down);
+        await waitFor(() => viewButton.menu.isOpen, 'keyboard reopens menu');
+        key(Clutter.KEY_Escape);
+        await waitFor(() => !viewButton.menu.isOpen, 'Escape closes menu');
+        assert(extension._source === first, 'Keyboard interaction must retain its target window');
+        firstGroup.change_action_state('checked', new GLib.Variant('b', false));
+        await waitFor(() => !binding('win.checked').actor._menuLabNode.toggle.checked,
+            'restore checkbox after keyboard check');
+        assert(!binding('win.checked').actor.get_accessible().ref_state_set().contains_state(Atk.StateType.CHECKED),
+            'Checkbox reset must clear its checked accessibility state');
+        await select(windows[0]);
+        passed.push('Virtual keyboard opens, navigates, activates and dismisses menus in the private compositor');
+        const pointer = global.stage.context.get_backend().get_default_seat()
+            .create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        const click = async actor => {
+            const [x, y] = actor.get_transformed_position();
+            const [width, height] = actor.get_transformed_size();
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), x + width / 2, y + height / 2);
+            await waitFor(() => actor.hover, 'virtual pointer enters target');
+            pointer.notify_button(GLib.get_monotonic_time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+            pointer.notify_button(GLib.get_monotonic_time() + 1000, Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+        };
+        await click(viewButton);
+        await waitFor(() => viewButton.menu.isOpen && viewButton.menu.actor.opacity === 255 &&
+            viewButton.menu.actor.scale_y === 1 && viewButton.menu.actor.translation_y === 0,
+        'pointer opens View menu and its animation finishes');
+        await click(binding('win.checked').actor);
+        await waitFor(() => firstGroup.get_action_state('checked').unpack() && !viewButton.menu.isOpen,
+            'pointer activates the exact application checkbox');
+        assert(extension._source === first, 'Pointer interaction must retain its target window');
+        firstGroup.change_action_state('checked', new GLib.Variant('b', false));
+        await waitFor(() => !binding('win.checked').actor._menuLabNode.toggle.checked,
+            'restore checkbox after pointer check');
+        passed.push('Virtual pointer opens the panel menu and executes its application command');
         const reportDirectory = GLib.path_get_dirname(GLib.getenv('GNOMENU_REPORT'));
         const capture = async name => {
             const stream = Gio.File.new_for_path(GLib.build_filenamev([reportDirectory, name]))
@@ -370,6 +436,19 @@ export default class ShellTestDriver extends Extension {
         await waitFor(() => Main.extensionManager.lookup(UUID)?.stateObj?._bindings.length > 0,
             'extension re-enable');
         passed.push('Extension can be enabled again without restarting Shell');
+        for (let cycle = 0; cycle < 3; cycle++) {
+            const active = Main.extensionManager.lookup(UUID).stateObj;
+            const source = active._source;
+            await Main.extensionManager.disableExtension(UUID);
+            await waitFor(() => source.closed && active._buttons.length === 0 &&
+                !Object.keys(Main.panel.statusArea).some(name => name.startsWith(`${UUID}-`)),
+            'repeated disable cleans up its source and panel registrations');
+            await Main.extensionManager.enableExtension(UUID);
+            await waitFor(() => active._bindings.length > 0, 'repeated enable restores the source');
+            assert(Object.keys(Main.panel.statusArea).filter(name => name.startsWith(`${UUID}-`)).length ===
+                active._buttons.length, 'Repeated enable must not duplicate panel registrations');
+        }
+        passed.push('Three additional disable/enable cycles restore menus without duplicate panel registrations');
     }
 
     disable() {

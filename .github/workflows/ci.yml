@@ -35,7 +35,7 @@ jobs:
       - run: dbus-run-session -- python3 tests/run-integration.py
       - run: dbus-run-session -- python3 tests/run-i18n.py
       - run: python3 tools/package.py
-      - run: python3 tools/audit-release.py
+      - run: python3 tools/audit-release.py --release
       - name: Save package and reports
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

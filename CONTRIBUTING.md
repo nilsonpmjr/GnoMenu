@@ -41,6 +41,8 @@ A new adapter needs an application version, package source, display backend and 
 
 Existing real-app tests observe Nautilus through a private AT-SPI bus and verify Ptyxis state through its exported actions. They use empty temporary folders and terminal commands that only sleep.
 
+Fixture Shell tests also inject virtual keyboard and pointer events into the private compositor. They verify opening a menu with Down, moving with Up/Down, activating a checkbox with Return, dismissing with Escape and clicking a menu command. They check checkbox/radio accessibility roles and changes to the checked state. Repeated disable/enable checks verify that panel registrations are removed and restored without duplication. These checks do not replace physical-input or screen-reader testing.
+
 GitHub Actions runs lint, protocol, translation and package checks in a clean Fedora container. Full compositor and real-application checks are a separate local requirement; the workflow does not claim to exercise a graphical desktop.
 
 ## Review

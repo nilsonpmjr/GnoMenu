@@ -48,7 +48,7 @@ report = {
     'dropdown_alignment': json.loads((reports / 'dev-session/alignment.json').read_text()),
     'bundle_sha256': hashlib.sha256(bundle.read_bytes()).hexdigest(),
     'limits': [
-        'Shell actor activation is programmatic; physical input, full keyboard navigation and accessibility are not verified.',
+        'Basic keyboard navigation and pointer activation use virtual devices in the private compositor; physical input, full keyboard coverage and screen-reader behavior remain unverified.',
         'DBusMenu adapter is tested independently; automatic source-to-window discovery and panel integration are pending.',
         'AppMenu registrar was exercised only on an isolated bus; it is not installed or started by the extension.',
         'Registry-to-source discovery uses explicitly supplied window IDs; it is not yet connected to Mutter window discovery.',

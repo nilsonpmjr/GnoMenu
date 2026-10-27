@@ -4,9 +4,9 @@ GnoMenu is a community extension under development. It has not been submitted or
 
 ## Project identity
 
-Before the first submission, add the real public repository URL and select a permanent UUID namespace under your control. The current `.local` UUID is for development.
+The public repository is [nilsonpmjr/GnoMenu](https://github.com/nilsonpmjr/GnoMenu), and the permanent UUID is `gnomenu@nilsonpmjr.github.io`. The older `gnomenu@nilsonpmjr.local` installation is a development identity.
 
-Replace the example account with the account that owns the repository:
+For a fork, configure a repository and permanent UUID under the new maintainer's control:
 
 ```bash
 python3 tools/configure-project.py https://github.com/YOUR-ACCOUNT/GnoMenu \
@@ -19,7 +19,7 @@ Changing the UUID creates a separate installed extension. Disable the developmen
 
 ## Publish the source on GitHub
 
-Create an empty public repository on GitHub. From the project root, configure its URL and UUID using the command above, then review and commit the source:
+The project's `main` branch is already published. To publish a fork, create an empty public repository on GitHub. From the project root, configure its URL and UUID using the command above, then review and commit the source:
 
 ```bash
 git status --short
@@ -43,6 +43,8 @@ python3 tools/audit-release.py --release
 ```
 
 The full verifier tests the actual built ZIP in private GNOME sessions, including real Nautilus/Ptyxis windows and pt-BR. The release audit checks archive contents, module availability, catalogs, licensing and public metadata.
+
+Basic input checks use virtual keyboard and pointer devices in the private compositor. They cover menu opening, Up/Down navigation, Return activation, Escape dismissal and a pointer click on an application command. The fixture checks also repeat disable/enable to verify source disposal and panel registration cleanup.
 
 The ZIP includes only runtime JavaScript, metadata, CSS, compiled translation catalogs and COPYING. It excludes test drivers, Python scripts, research modules, node_modules, source PO/POT files and logs.
 

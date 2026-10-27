@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 GnoMenu contributors
 import Clutter from 'gi://Clutter';
+import Atk from 'gi://Atk';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
@@ -268,6 +269,8 @@ export default class GnoMenu extends Extension {
             actor._menuLabNode = node;
             actor.setSensitive(Boolean(node?.enabled));
             const toggle = node?.toggle;
+            actor.accessible_role = !toggle ? Atk.Role.MENU_ITEM :
+                toggle.type === 'radio' ? Atk.Role.RADIO_MENU_ITEM : Atk.Role.CHECK_MENU_ITEM;
             actor.setOrnament(!toggle ? PopupMenu.Ornament.HIDDEN :
                 toggle.type === 'radio' ?
                     (toggle.checked ? PopupMenu.Ornament.DOT : PopupMenu.Ornament.NO_DOT) :
