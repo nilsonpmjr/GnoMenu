@@ -69,6 +69,8 @@ This downloads a matching Fedora RPM, verifies its signature and extracts the vi
 
 An optional [native Nautilus exporter experiment](docs/native-exporter.md) imports its real toolbar, tab, breadcrumb, file-selection and background menu models, including widget actions and local-control restoration. Commands retain their native context; changing selection retires commands from the previous snapshot. It runs only through the private test/demo harness and is not included in the extension ZIP or enabled by the installer.
 
+Private real-app checks include Copy/Paste and Cut/Paste between two Files windows, plus single-folder Rename through the native filename entry. Renaming also retires commands that still carry the old display name.
+
 ## Languages
 
 GnoMenu inherits the session language through gettext. Initial catalogs cover Brazilian and European Portuguese, Spanish, French, German and Italian. English is the fallback.

@@ -35,6 +35,7 @@ lists = []
 tabs = []
 names = set()
 dialogs = []
+entries = []
 tab_details = []
 visited = 0
 
@@ -54,6 +55,11 @@ def walk(node, depth=0):
                 names.add(name)
             if role == Atspi.Role.DIALOG:
                 dialogs.append(name)
+            if node.get_state_set().contains(Atspi.StateType.EDITABLE):
+                text = node.get_text_iface()
+                if text is not None:
+                    entries.append({'name': name, 'text': Atspi.Text.get_text(text, 0,
+                                    Atspi.Text.get_character_count(text))})
         children = [child for i in range(node.get_child_count())
                     if (child := node.get_child_at_index(i)) is not None]
         if role == Atspi.Role.PAGE_TAB:
@@ -76,4 +82,4 @@ def walk(node, depth=0):
 walk(found)
 print(json.dumps({'found': True, 'frames': frames, 'visibleTabEntries': max([len(tabs), *lists]),
                   'tabLists': lists, 'tabs': tabs, 'names': sorted(names), 'dialogs': dialogs,
-                  'tabDetails': tab_details}, ensure_ascii=False))
+                  'tabDetails': tab_details, 'entries': entries}, ensure_ascii=False))

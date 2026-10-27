@@ -29,6 +29,7 @@ typedef struct {
     GFile *location;
     GList *selection;
     char *title;
+    gboolean invalidated;
 } FilePopupContext;
 
 static gboolean file_popup_valid(GtkPopover *popover, guint token);
@@ -526,11 +527,22 @@ static FileViewContext *file_view_watch(GtkWidget *view)
     return context;
 }
 
+static void selected_name_changed(GObject *file, GParamSpec *spec, gpointer data)
+{
+    (void)file;
+    (void)spec;
+    // A rename can keep the same selected GObject while changing its identity
+    // as presented in the panel. Never keep the old named context actionable.
+    ((FilePopupContext *)data)->invalidated = TRUE;
+}
+
 static void file_popup_free(gpointer data)
 {
     FilePopupContext *capture = data;
     g_weak_ref_clear(&capture->view);
     g_clear_object(&capture->location);
+    for (GList *item = capture->selection; item; item = item->next)
+        g_signal_handlers_disconnect_by_data(item->data, capture);
     // Nautilus 50.4's public selection getter transfers a list of GObject refs.
     g_list_free_full(capture->selection, g_object_unref);
     g_free(capture->title);
@@ -541,7 +553,7 @@ static gboolean file_popup_valid(GtkPopover *popover, guint token)
 {
     FilePopupContext *capture = g_object_get_data(G_OBJECT(popover), FILE_POPUP_KEY);
     g_autoptr(GtkWidget) view = capture ? g_weak_ref_get(&capture->view) : NULL;
-    if (!view || capture->token != token || !gtk_widget_get_mapped(view))
+    if (!view || capture->invalidated || capture->token != token || !gtk_widget_get_mapped(view))
         return FALSE;
     FileViewContext *context = g_object_get_data(G_OBJECT(view), FILE_VIEW_KEY);
     g_autoptr(GtkPopover) current = context ? g_weak_ref_get(&context->popup) : NULL;
@@ -584,6 +596,7 @@ static void capture_file_popup(GtkPopover *popover)
         for (GList *item = capture->selection; item; item = item->next) {
             g_autofree char *name = NULL;
             g_object_get(item->data, "display-name", &name, NULL);
+            g_signal_connect(item->data, "notify::display-name", G_CALLBACK(selected_name_changed), capture);
             if (title->len)
                 g_string_append(title, ", ");
             g_string_append(title, name ? name : "");

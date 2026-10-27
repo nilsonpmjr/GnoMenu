@@ -16,6 +16,8 @@ This is a working experiment for the native RPM application. It is outside the i
 
 ![Original background menu imported into the panel](images/native-background.png)
 
+![Captured Rename opens Nautilus's native filename entry](images/native-rename.png)
+
 ## Reproduce
 
 On Fedora/Bazzite, use the distribution Python with PyGObject. Build with installed GTK4 development headers:
@@ -87,6 +89,8 @@ Selection headings use the native display names, joined with commas for multiple
 
 The native context popups remain available. Capture requires a native popup request, and a changed context requires reopening it. This establishes the model families, not full validation of every command, file type or extension-provided menu.
 
+The seventh iteration also retires a capture when a selected object's native `display-name` changes. A rename can retain the same file object and selection; pointer identity alone therefore cannot keep the panel heading correct. The exporter watches the native property notification and disconnects those handlers when releasing the capture. Reopening the menu captures the new name with fresh aliases.
+
 ## Local controls
 
 When all three supported menus have resolved their actions and custom slots, the library exposes a boolean `win.show-menubar` action. GnoMenu's existing capture lifecycle uses it to hide the original menu buttons, including a responsive duplicate when present. The original visibility flags are restored when capture ends or the extension is disabled. Other toolbar controls and uncaptured context menus remain available.
@@ -99,7 +103,7 @@ If a supported model disappears or cannot resolve its actions, the exporter rest
 
 Observed environment: Nautilus `50.4-1.fc44`, GTK `4.22.5-2.fc44`, GNOME Shell `50.6-1.fc44`, Wayland on Bazzite 44.
 
-Thirty-two check groups cover the two locale sessions:
+Thirty-eight check groups cover the two locale sessions:
 
 - Original Main Menu/View Options/Current Folder Menu models, native custom zoom entries and tuple targets are imported.
 - Show Hidden Files reveals a real hidden test file. Nautilus intentionally shares this preference across its windows; the exporter preserves that behavior.
@@ -116,13 +120,16 @@ Thirty-two check groups cover the two locale sessions:
 - The imported background Select All command selects two real folders. Their native multi-selection menu opens both in actual background tabs, preserving the active directory.
 - A native single-selection menu opens only the selected folder in a background tab.
 - Replacing selection A with B removes A's aliases. Replaying the retired alias creates no tab; B's newly captured command opens only B.
+- Captured Copy and native Paste copy a selected temporary folder to the other Files window. Exact marker contents are checked, the source remains intact and the unselected folder is absent from the destination.
+- Captured Cut and native Paste move a different selected folder to the other window. Exact contents arrive, the source disappears and the old selection aliases are retired.
+- Captured Rename opens Nautilus's real filename entry. Native keyboard input renames a temporary folder without changing its contents or independent copy. Old name aliases disappear, replay does not reopen a rename entry, and a new popup uses the renamed folder's caption and fresh aliases.
 - Original local menu controls return when focus changes to the other window and when GnoMenu is disabled.
 
 On this GTK Wayland build, AT-SPI reports zero screen origins and false selected flags for the native tab objects, and accessible child enumeration does not track visual reordering. The test uses native action availability and the actual window title for movement/selection checks. Pointer input uses the declared private narrow layout, while accessible names and the resulting closed/remaining page establish which tab was targeted. This is not validation of arbitrary themes, scale factors or tab-strip layouts.
 
 Breadcrumb pointer checks use a fixed 1100px layout in the same private compositor. The resulting accessible tab titles establish the opened folder. A real outside click dismisses any remaining native popup grab before interacting with another segment. Properties, Open in New Window, file-renaming/deletion cases and the narrow interval between native context replacement and alias retirement still need dedicated checks.
 
-File-context pointer input uses the same fixed width in list mode, with two temporary test folders. The resulting tab names/count establish the commands' actual targets. Tests do not exercise deletion, trash, cut/copy/paste, external application launching, large selections, arbitrary extension menus or the full range of file types and races.
+File-context pointer input uses the same fixed width in list mode, with two temporary test folders. Tab names/count establish open-command targets; marker contents and source/destination existence establish clipboard and rename effects. Clipboard operations stay on the private Wayland compositor. Tests do not exercise deletion, trash, other clipboard formats, batch rename, external application launching, large selections, arbitrary extension menus or the full range of file types and races.
 
 The regular 101 check groups also passed without loading the optional library. The extension ZIP includes the Shell actor-lifetime cleanup fix; the native library remains outside the ZIP and normal installation.
 
@@ -140,6 +147,8 @@ Local artifacts:
 - `reports/dev-session/real-apps/native-exporter/native-selection.png`: original single-selection menu.
 - `reports/dev-session/real-apps/native-exporter/native-selection-model.json`: native labels/action aliases, target name and exact window owner/path.
 - `reports/dev-session/real-apps/native-exporter/native-background.png`: original background menu.
+- `reports/dev-session/real-apps/native-exporter/native-rename.png`: actual native rename entry before input.
+- `reports/dev-session/real-apps/native-exporter/native-clipboard.json`: observed source/destination contents, copy/move/rename results, window paths and alias-retirement evidence.
 - `reports/dev-session/real-apps/native-exporter/native-controls-restored.png`: controls after disable.
 - `reports/rea-native-exporter.json`: retained REA controlled-replay evidence.
 
@@ -149,7 +158,7 @@ REA static evidence: `ev_2820ecf786e0d1826f0ea9d3cda77d7eeb00642a5503f44e5962495
 
 ## Remaining work
 
-- Validate more file types, multi-selection cases, extension-provided entries, clipboard operations and destructive actions under dedicated temporary fixtures. The main toolbar and context model families are captured; comprehensive command coverage remains pending.
+- Validate more file types, clipboard formats, multi-selection cases, extension-provided entries, batch rename and trash/deletion under dedicated temporary fixtures. The main toolbar and context model families are captured; comprehensive command coverage remains pending.
 - Validate the remaining breadcrumb commands, context-replacement races, navigation/rename/deletion and responsive layouts while a breadcrumb context is captured.
 - Validate tab detachment, restoring closed tabs, closing other tabs, page transfer, keyboard context requests and repeated focus changes while a tab menu is open.
 - Extend the bounded tab, view-mode and responsive-layout checks to navigation, background/foreground transitions and long-running stress.
@@ -171,3 +180,4 @@ The matching Nautilus source checkout is commit `87bba3cbe6aa2b13a08aebe1330d61c
 - [Current Folder Menu and breadcrumb menu definitions](https://github.com/GNOME/nautilus/blob/87bba3cbe6aa2b13a08aebe1330d61c967b1f6d0/src/resources/menu/nautilus-pathbar-context-menu.ui)
 - [Native Current Folder Menu caption and population](https://github.com/GNOME/nautilus/blob/87bba3cbe6aa2b13a08aebe1330d61c967b1f6d0/src/nautilus-pathbar.c)
 - [Widget action groups and shared hidden-file preference](https://github.com/GNOME/nautilus/blob/87bba3cbe6aa2b13a08aebe1330d61c967b1f6d0/src/nautilus-files-view.c)
+- [Native file display-name property and change notification](https://github.com/GNOME/nautilus/blob/87bba3cbe6aa2b13a08aebe1330d61c967b1f6d0/src/nautilus-file.c)

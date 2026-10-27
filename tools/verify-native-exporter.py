@@ -37,7 +37,7 @@ report = {
     'cases': cases,
     'limits': [
         'Actual toolbar, tab, clicked breadcrumb, file-selection and background context models of Nautilus 50.4 are captured.',
-        'Generic widget-class actions, long-running stress, destructive file actions, arbitrary extension menus and Flatpak loading are not validated.',
+        'Generic widget-class actions, long-running stress, trash/deletion, arbitrary extension menus and Flatpak loading are not validated.',
         'Tab cycles, narrow/wide resizing and grid/list changes cover the declared Nautilus version only.',
         'The optional library is loaded into test Nautilus processes only; it is outside the extension ZIP.',
         'Show Hidden Files preserves the native shared preference; sort targets are checked on two separate windows.',
@@ -46,6 +46,7 @@ report = {
         'Tab pointer input uses the declared private narrow layout; GTK Wayland AT-SPI tab screen origins/selected flags are unreliable in this build.',
         'Breadcrumb checks cover background-tab opening and replacement of a clicked target in the private 1100px layout; New Window, Properties and click-to-retirement races remain unverified.',
         'File-context checks cover background Select All, opening one/two selected folders and retiring stale selection aliases in a fixed private list layout.',
+        'Native Copy/Paste, Cut/Paste and single-folder Rename are verified with exact marker contents in private temporary directories; other clipboard formats, file types and batch rename remain unverified.',
         'Selection snapshots use the documented source contract of Nautilus 50.4 GObject properties and are limited to 128 selected objects; other versions and large selections need separate validation.',
     ],
 }

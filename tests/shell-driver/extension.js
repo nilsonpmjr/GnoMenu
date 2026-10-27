@@ -452,8 +452,11 @@ export default class ShellTestDriver extends Extension {
         passed.push('Changing breadcrumb targets retires the previous aliases without redirecting stale commands');
         const contextDirectory = currentDirectory.get_child(createdName);
         const names = ['gnomenu-context-A', 'gnomenu-context-B'];
-        for (const name of names)
+        for (const name of names) {
             contextDirectory.get_child(name).make_directory(null);
+            GLib.file_set_contents(contextDirectory.get_child(name).get_child('marker.txt').get_path(),
+                `GnoMenu native clipboard fixture: ${name}\n`);
+        }
         const fileCommand = name => extension._bindings.find(entry => {
             const action = entry.actor._menuLabNode?.action;
             return action?.startsWith('win.gnomenu.files.') && action.endsWith(`.view.${name}`);
@@ -561,6 +564,119 @@ export default class ShellTestDriver extends Extension {
         firstGroup.activate_action('close-other-tabs', null);
         await waitTabs(1);
         passed.push('Changing native selection withdraws stale commands without redirecting them to a different folder');
+        const dismissThroughSidebar = async () => {
+            const frame = windows[0].get_frame_rect();
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), frame.x + 80, frame.y + 350);
+            pointer.notify_button(GLib.get_monotonic_time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+            pointer.notify_button(GLib.get_monotonic_time() + 1000, Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+            await observe(windows[0]);
+        };
+        const selectContextRow = async (offset, name, action) => {
+            await select(windows[0]);
+            await dismissThroughSidebar();
+            await clickContent(offset);
+            await clickContent(offset, Clutter.BUTTON_SECONDARY);
+            await waitFor(() => fileCommand(action)?.actor.sensitive && extension._buttons.some(button =>
+                button.get_first_child().text === name && button.menu.actor.contains(fileCommand(action).actor)),
+            'native context matches the requested temporary folder');
+            escape();
+            await observe(windows[0]);
+        };
+        const markerText = file => file.query_exists(null) ?
+            new globalThis.TextDecoder().decode(file.load_contents(null)[1]) : null;
+        const destination = fixtureDirectory(windows[1]);
+        await selectContextRow(114, names[0], 'copy');
+        fileCommand('copy').actor.activate(null);
+        await observe(windows[0]);
+        await select(windows[1]);
+        await waitFor(() => binding('win.gnomenu.view.paste')?.actor.sensitive,
+            'the other window accepts the native clipboard');
+        binding('win.gnomenu.view.paste').actor.activate(null);
+        await waitFor(() => markerText(destination.get_child(names[0]).get_child('marker.txt')) ===
+            `GnoMenu native clipboard fixture: ${names[0]}\n`, 'native copy/paste creates the correct contents in the other directory');
+        assert(contextDirectory.get_child(names[0]).get_child('marker.txt').query_exists(null),
+            'Copy must preserve the original source');
+        assert(!destination.get_child(names[1]).query_exists(null), 'Copy must not include the unselected folder');
+        const clipboardEvidence = {
+            windowPaths: windows.map(window => window.get_gtk_window_object_path()),
+            sourceDirectory: contextDirectory.get_path(),
+            destinationDirectory: destination.get_path(),
+            copy: {
+                source: markerText(contextDirectory.get_child(names[0]).get_child('marker.txt')),
+                destination: markerText(destination.get_child(names[0]).get_child('marker.txt')),
+                unselectedDestinationExists: destination.get_child(names[1]).query_exists(null),
+            },
+        };
+        passed.push('Captured Copy and native Paste transfer the selected folder with exact contents to the other Files window');
+        await selectContextRow(166, names[1], 'cut');
+        const cutAlias = fileCommand('cut').actor._menuLabNode.action.slice(4);
+        fileCommand('cut').actor.activate(null);
+        await observe(windows[0]);
+        await select(windows[1]);
+        await waitFor(() => binding('win.gnomenu.view.paste')?.actor.sensitive, 'native cut clipboard is available');
+        binding('win.gnomenu.view.paste').actor.activate(null);
+        await waitFor(() => markerText(destination.get_child(names[1]).get_child('marker.txt')) ===
+            `GnoMenu native clipboard fixture: ${names[1]}\n` && !contextDirectory.get_child(names[1]).query_exists(null),
+        'native cut/paste moves the correct folder and contents');
+        await waitFor(() => !firstGroup.has_action(cutAlias), 'moving the selected file retires its previous context');
+        clipboardEvidence.cut = {
+            sourceExists: contextDirectory.get_child(names[1]).query_exists(null),
+            destination: markerText(destination.get_child(names[1]).get_child('marker.txt')),
+            oldAliasPresent: firstGroup.has_action(cutAlias),
+        };
+        passed.push('Captured Cut and native Paste move only the selected temporary folder and retire its old aliases');
+        await selectContextRow(114, names[0], 'rename');
+        const renameAlias = fileCommand('rename').actor._menuLabNode.action.slice(4);
+        fileCommand('rename').actor.activate(null);
+        const waitEntry = async text => {
+            const until = GLib.get_monotonic_time() + 8000000;
+            while (GLib.get_monotonic_time() < until) {
+                if ((await observe(windows[0])).entries?.some(entry => entry.text === text))
+                    return;
+            }
+            throw new Error('Native rename entry did not expose the expected text');
+        };
+        await waitEntry(names[0]);
+        await capture('native-rename.png');
+        const renameTime = GLib.get_monotonic_time();
+        keyboard.notify_keyval(renameTime, Clutter.KEY_Control_L, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(renameTime + 1000, Clutter.KEY_a, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(renameTime + 2000, Clutter.KEY_a, Clutter.KeyState.RELEASED);
+        keyboard.notify_keyval(renameTime + 3000, Clutter.KEY_Control_L, Clutter.KeyState.RELEASED);
+        const renamed = 'gnomenu-renamed-A';
+        for (const character of renamed) {
+            const time = GLib.get_monotonic_time();
+            keyboard.notify_keyval(time, character.codePointAt(0), Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time + 1000, character.codePointAt(0), Clutter.KeyState.RELEASED);
+        }
+        await waitEntry(renamed);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Return, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time() + 1000, Clutter.KEY_Return, Clutter.KeyState.RELEASED);
+        await waitFor(() => markerText(contextDirectory.get_child(renamed).get_child('marker.txt')) ===
+            `GnoMenu native clipboard fixture: ${names[0]}\n` && !contextDirectory.get_child(names[0]).query_exists(null),
+        'native rename changes the real source directory and preserves contents');
+        await waitFor(() => !firstGroup.has_action(renameAlias), 'renaming retires commands carrying the old display name');
+        assert(markerText(destination.get_child(names[0]).get_child('marker.txt')) ===
+            `GnoMenu native clipboard fixture: ${names[0]}\n`, 'Rename must not alter the independent copied folder');
+        const renameCloseDeadline = GLib.get_monotonic_time() + 8000000;
+        while ((await observe(windows[0])).entries?.some(entry => entry.text === renamed)) {
+            if (GLib.get_monotonic_time() > renameCloseDeadline)
+                throw new Error('Native rename entry did not close after accepting the name');
+        }
+        firstGroup.activate_action(renameAlias, null);
+        assert(!(await observe(windows[0])).entries?.some(entry => entry.text === renamed),
+            'A retired rename alias must not reopen a dialog for the renamed file');
+        await selectContextRow(114, renamed, 'rename');
+        clipboardEvidence.rename = {
+            oldPathExists: contextDirectory.get_child(names[0]).query_exists(null),
+            contents: markerText(contextDirectory.get_child(renamed).get_child('marker.txt')),
+            independentCopy: markerText(destination.get_child(names[0]).get_child('marker.txt')),
+            oldAliasPresent: firstGroup.has_action(renameAlias),
+            newContextAction: fileCommand('rename').actor._menuLabNode.action,
+        };
+        GLib.file_set_contents(GLib.build_filenamev([directory, 'native-clipboard.json']),
+            JSON.stringify(clipboardEvidence, null, 2));
+        passed.push('Captured Rename opens the native entry, preserves file contents and retires the original name context');
         GLib.file_set_contents(GLib.build_filenamev([directory, 'native-model.json']), JSON.stringify({
             headings: extension._buttons.map(button => button.get_first_child().text),
             menuPath: extension._source.descriptor.menuPath,
