@@ -9,6 +9,10 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(GActionGroup, g_object_unref)
 
 #define GROUPS_KEY "gnomenu-native-groups"
 #define WINDOW_KEY "gnomenu-native-window"
+#define MAIN_MENU 1u
+#define VIEW_MENU 2u
+#define FOLDER_MENU 4u
+#define REQUIRED_MENUS (MAIN_MENU | VIEW_MENU | FOLDER_MENU)
 
 typedef struct {
     GWeakRef origin;
@@ -356,8 +360,10 @@ static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *wi
         GMenuModel *model = gtk_menu_button_get_menu_model(GTK_MENU_BUTTON(widget));
         if (!model && GTK_IS_POPOVER_MENU(popover))
             model = gtk_popover_menu_get_menu_model(GTK_POPOVER_MENU(popover));
-        guint kind = !model ? 0 : has_action(model, "app.clone-window", 0) ? 1 :
-            has_action(model, "view.show-hidden-files", 0) ? 2 : 0;
+        guint kind = !model ? 0 : has_action(model, "app.clone-window", 0) ? MAIN_MENU :
+            has_action(model, "view.show-hidden-files", 0) ? VIEW_MENU :
+            has_action(model, "view.current-directory-properties", 0) &&
+            has_action(model, "slot.reload", 0) ? FOLDER_MENU : 0;
         if (kind) {
             const char *caption = gtk_widget_get_tooltip_text(widget);
             if (caption && *caption) {
@@ -425,13 +431,13 @@ static gboolean scan(gpointer data)
                        gtk_application_window_get_id(GTK_APPLICATION_WINDOW(window)), export->menus,
                        g_hash_table_size(export->proxies), export->issues);
         }
-        if (export->menus == 2 && export->issues == 0 && !export->visibility &&
+        if (export->menu_kinds == REQUIRED_MENUS && export->issues == 0 && !export->visibility &&
             !g_action_map_lookup_action(G_ACTION_MAP(window), "show-menubar")) {
             export->visibility = g_simple_action_new_stateful("show-menubar", NULL, g_variant_new_boolean(TRUE));
             g_signal_connect(export->visibility, "change-state", G_CALLBACK(visibility_changed), export);
             g_action_map_add_action(G_ACTION_MAP(window), G_ACTION(export->visibility));
         }
-        if (export->visibility && (export->issues || export->menus != 2)) {
+        if (export->visibility && (export->issues || export->menu_kinds != REQUIRED_MENUS)) {
             g_action_group_change_action_state(G_ACTION_GROUP(window), "show-menubar", g_variant_new_boolean(TRUE));
             g_action_map_remove_action(G_ACTION_MAP(window), "show-menubar");
             g_signal_handlers_disconnect_by_data(export->visibility, export);

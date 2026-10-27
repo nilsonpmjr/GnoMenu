@@ -35,7 +35,7 @@ These steps prepare a community extension for the catalog. GNOME approval is a s
 
 ## Compatibility work
 
-- Working optional prototype: actual Nautilus Main Menu/View Options, widget-action forwarding, local control hiding/restoration and two-window checks in two locales. See `docs/native-exporter.md`; the default installation remains the partial adapter.
+- Working optional prototype: actual Nautilus Main Menu/View Options/Current Folder Menu, widget-action forwarding, local control hiding/restoration and two-window checks in two locales. Native folder creation and bookmark operations are verified against the private filesystem. See `docs/native-exporter.md`; the default installation remains the partial adapter.
 - Native exporter follow-up: keep bindings current across tab lifetimes and view changes, deduplicate responsive header/bottom-bar menus and restore controls when capture becomes incomplete.
 - Export original local menu models and their widget actions from applications that currently keep them private, starting with Nautilus/Ptyxis.
 - Prove the association between DBusMenu registrations and actual Mutter windows.

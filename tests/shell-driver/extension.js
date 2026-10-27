@@ -101,14 +101,16 @@ export default class ShellTestDriver extends Extension {
             throw new Error(`Actual hidden-file visibility did not become ${visible}`);
         };
         await select(windows[0]);
-        assert(!extension._source.partial && extension._buttons.length === 3,
-            'Bridge must import the two actual menu models, without synthetic categories');
+        await waitFor(() => binding('win.gnomenu.slot.reload')?.actor.sensitive && extension._buttons.length === 4,
+            'native current-folder model and its slot actions are imported');
+        assert(!extension._source.partial,
+            'Bridge must import the three actual menu models, without synthetic categories');
         assert(binding('win.gnomenu.view.zoom-in') && binding('win.gnomenu.view.sort') &&
             binding('win.gnomenu.view.show-hidden-files'), 'Native custom zoom, typed sort and hidden-file commands must exist');
         const firstGroup = extension._source._groups.get('win');
         await waitFor(() => firstGroup.has_action('show-menubar') &&
             !firstGroup.get_action_state('show-menubar').unpack(), 'captured native controls hide');
-        passed.push('Real Main Menu and View Options models, custom zoom buttons and tuple targets import without invented menus');
+        passed.push('Real Main, View Options and Current Folder models import with native captions, widget actions and typed targets');
         await waitHidden(windows[0], false);
         binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
         await waitFor(() => binding('win.gnomenu.view.show-hidden-files').actor._menuLabNode.toggle.checked,
@@ -173,7 +175,7 @@ export default class ShellTestDriver extends Extension {
             await waitHidden(windows[0], true);
             binding('win.gnomenu.view.show-hidden-files').actor.activate(null);
             await waitHidden(windows[0], false);
-            assert(extension._buttons.length === 3, 'Responsive layout must not duplicate imported menus');
+            assert(extension._buttons.length === 4, 'Responsive layout must not duplicate imported menus');
         }
         passed.push('Narrow and wide Files layouts retain working imported commands without duplicate menus');
         const keyboard = global.stage.context.get_backend().get_default_seat()
@@ -204,6 +206,62 @@ export default class ShellTestDriver extends Extension {
         await viewMode(Clutter.KEY_2, 'win.gnomenu.view.visible-captions');
         assert(!binding('win.gnomenu.view.visible-columns'), 'Grid view must hide native list-only commands');
         passed.push('Real keyboard view-mode changes replace native menu entries and preserve live widget commands');
+        const fixtureDirectory = window => Gio.File.new_for_path(GLib.build_filenamev([
+            GLib.getenv('GNOMENU_TEST_WORKSPACE'),
+            window.title.includes('GnoMenu test folder A') ? 'GnoMenu test folder A' : 'GnoMenu test folder B',
+        ]));
+        const bookmarks = Gio.File.new_for_path(GLib.build_filenamev([
+            GLib.getenv('XDG_CONFIG_HOME'), 'gtk-3.0', 'bookmarks',
+        ]));
+        const bookmarkText = () => bookmarks.query_exists(null) ?
+            new globalThis.TextDecoder().decode(bookmarks.load_contents(null)[1]) : '';
+        const currentDirectory = fixtureDirectory(windows[0]);
+        binding('win.gnomenu.slot.bookmark-current-directory').actor.activate(null);
+        await waitFor(() => bookmarkText().includes(currentDirectory.get_uri()) &&
+            binding('win.gnomenu.slot.unbookmark-current-directory')?.actor.sensitive &&
+            !binding('win.gnomenu.slot.bookmark-current-directory'),
+        'native bookmark file and menu change together');
+        await select(windows[1]);
+        await waitFor(() => binding('win.gnomenu.slot.bookmark-current-directory')?.actor.sensitive,
+            'second directory retains its own bookmark action');
+        assert(!bookmarkText().includes(fixtureDirectory(windows[1]).get_uri()),
+            'Bookmark command must affect only its original directory');
+        await select(windows[0]);
+        await waitFor(() => binding('win.gnomenu.slot.unbookmark-current-directory')?.actor.sensitive,
+            'original directory retains its native remove-bookmark command');
+        binding('win.gnomenu.slot.unbookmark-current-directory').actor.activate(null);
+        await waitFor(() => !bookmarkText().includes(currentDirectory.get_uri()) &&
+            binding('win.gnomenu.slot.bookmark-current-directory')?.actor.sensitive,
+        'native bookmark can be removed and original menu restored');
+        passed.push('Current Folder bookmark commands change the private native bookmark file for the correct directory');
+        binding('win.gnomenu.view.new-folder').actor.activate(null);
+        const deadline = GLib.get_monotonic_time() + 8000000;
+        let dialogShown = false;
+        while (GLib.get_monotonic_time() < deadline) {
+            if ((await observe(windows[0])).dialogs?.length) {
+                dialogShown = true;
+                break;
+            }
+        }
+        assert(dialogShown, 'Imported New Folder command must open the actual native dialog');
+        const createdName = 'gnomenu-created-folder';
+        for (const character of createdName) {
+            const time = GLib.get_monotonic_time();
+            keyboard.notify_keyval(time, character.codePointAt(0), Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time + 1000, character.codePointAt(0), Clutter.KeyState.RELEASED);
+        }
+        await waitFor(() => true, 'deliver private keyboard input');
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Return, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time() + 1000, Clutter.KEY_Return, Clutter.KeyState.RELEASED);
+        await waitFor(() => currentDirectory.get_child(createdName).query_exists(null),
+            'native dialog creates a real folder in the selected directory');
+        assert(!fixtureDirectory(windows[1]).get_child(createdName).query_exists(null),
+            'New Folder command must not create a directory in the other window');
+        passed.push('Imported New Folder opens the native dialog and creates a real folder in the correct window');
+        await select(windows[0]);
+        await waitFor(() => firstGroup.get_action_state('show-menubar')?.unpack() === false &&
+            binding('win.gnomenu.slot.reload')?.actor.sensitive,
+        'captured models and local ownership recover after the native dialog closes');
         const directory = GLib.path_get_dirname(GLib.getenv('GNOMENU_REPORT'));
         GLib.file_set_contents(GLib.build_filenamev([directory, 'native-model.json']), JSON.stringify({
             headings: extension._buttons.map(button => button.get_first_child().text),
@@ -230,6 +288,9 @@ export default class ShellTestDriver extends Extension {
         menuFor('app.preferences').open(0);
         await capture('native-main-menu.png');
         menuFor('app.preferences').close(0);
+        menuFor('win.gnomenu.slot.reload').open(0);
+        await capture('native-current-folder.png');
+        menuFor('win.gnomenu.slot.reload').close(0);
         await Main.extensionManager.disableExtension(UUID);
         await waitFor(() => firstGroup.get_action_state('show-menubar')?.unpack() && extension._buttons.length === 0,
             'disable restores the original controls');

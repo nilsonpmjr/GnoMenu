@@ -19,10 +19,12 @@ frames = []
 found = None
 for index in range(desktop.get_child_count()):
     app = desktop.get_child_at_index(index)
-    if app.get_process_id() != pid:
+    if app is None or app.get_process_id() != pid:
         continue
     for child_index in range(app.get_child_count()):
         window = app.get_child_at_index(child_index)
+        if window is None:
+            continue
         frames.append(window.get_name())
         if window.get_name() == title:
             found = window
@@ -32,11 +34,14 @@ if found is None:
 lists = []
 tabs = []
 names = set()
+dialogs = []
 visited = 0
 
 
 def walk(node, depth=0):
     global visited
+    if node is None:
+        return
     visited += 1
     if visited > 2500 or depth > 40:
         return
@@ -46,7 +51,10 @@ def walk(node, depth=0):
             name = node.get_name()
             if name:
                 names.add(name)
-        children = [node.get_child_at_index(i) for i in range(node.get_child_count())]
+            if role == Atspi.Role.DIALOG:
+                dialogs.append(name)
+        children = [child for i in range(node.get_child_count())
+                    if (child := node.get_child_at_index(i)) is not None]
         if role == Atspi.Role.PAGE_TAB:
             tabs.append(node.get_name())
         if role == Atspi.Role.PAGE_TAB_LIST:
@@ -60,4 +68,4 @@ def walk(node, depth=0):
 
 walk(found)
 print(json.dumps({'found': True, 'frames': frames, 'visibleTabEntries': max([len(tabs), *lists]),
-                  'tabLists': lists, 'tabs': tabs, 'names': sorted(names)}, ensure_ascii=False))
+                  'tabLists': lists, 'tabs': tabs, 'names': sorted(names), 'dialogs': dialogs}, ensure_ascii=False))

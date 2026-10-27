@@ -92,6 +92,7 @@ def main():
             if args.native_exporter:
                 env['GNOMENU_TEST_NATIVE_EXPORTER'] = '1'
                 env['GNOMENU_OBSERVE_FILES'] = '1'
+                env['GNOMENU_TEST_WORKSPACE'] = str(workspace)
             # A private accessibility bus observes only these test applications.
             # Do not attach the observer to the user's desktop accessibility bus.
             accessibility_config = workspace / 'accessibility.conf'
