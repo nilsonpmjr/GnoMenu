@@ -56,6 +56,8 @@ The separate optional native exporter is documented in [the prototype guide](nat
 
 Toolbar, tab, breadcrumb and file-context wrappers carry the Files layout marker at creation; publishing a shared root does not mark every child indiscriminately. Real Back/Forward history popups stay unmarked and retain their native headings. Their aliases pin a popup generation, native model, active slot and location. Notifications permanently invalidate snapshots after slot/location changes, and dispatch checks the context again before resolving the widget group.
 
+An explicit navigation-control adapter also reads the mapped Back/Forward buttons within `NautilusHistoryControls`. Tooltip captions and `GtkActionable` contracts supply the entries; a marked layout-only section places them in Go. Their ordinary widget proxies follow the active slot within the pinned window. Toolbar buttons remain available locally; only menu controls participate in capture visibility ownership.
+
 ## Staged DBusMenu work
 
 The DBusMenu source, registrar and declared-ID resolver have private-bus integration tests. They remain outside the distribution ZIP and the production panel until actual Mutter-window association is proven.

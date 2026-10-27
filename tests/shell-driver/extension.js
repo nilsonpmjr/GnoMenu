@@ -130,6 +130,33 @@ export default class ShellTestDriver extends Extension {
         assert(binding('win.gnomenu.view.zoom-in') && binding('win.gnomenu.view.sort') &&
             binding('win.gnomenu.view.show-hidden-files'), 'Native custom zoom, typed sort and hidden-file commands must exist');
         const firstGroup = extension._source._groups.get('win');
+        const navigationMatches = async () => {
+            const state = await observe(windows[0]);
+            GLib.file_set_contents(GLib.build_filenamev([directory, 'native-navigation-state.json']), JSON.stringify({
+                title: windows[0].title, buttons: state.buttons,
+                menu: ['back', 'forward'].map(direction => ({direction,
+                    label: binding(`win.gnomenu.slot.${direction}`)?.actor.label.text,
+                    enabled: binding(`win.gnomenu.slot.${direction}`)?.actor.sensitive,
+                    exported: firstGroup.get_action_enabled(`gnomenu.slot.${direction}`)})),
+            }, null, 2));
+            return ['back', 'forward'].every(direction => {
+                const entry = binding(`win.gnomenu.slot.${direction}`);
+                return entry && inCategory(entry, 'Go') && state.buttons?.some(button =>
+                    button.name === entry.actor.label.text && button.sensitive === entry.actor.sensitive);
+            });
+        };
+        const waitNavigation = async () => {
+            const deadline = GLib.get_monotonic_time() + 4000000;
+            while (GLib.get_monotonic_time() < deadline) {
+                if (await navigationMatches())
+                    return;
+            }
+            throw new Error('Native toolbar/menu navigation states did not converge; inspect native-navigation-state.json');
+        };
+        await waitFor(() => binding('win.gnomenu.slot.back') && binding('win.gnomenu.slot.forward'),
+            'native navigation button actions are imported without opening a history popup');
+        assert(await navigationMatches(), 'Go navigation captions and sensitivity must match actual native buttons');
+        passed.push('Actual Back and Forward toolbar controls supply Go captions and enabled states without a popup request');
         await waitFor(() => firstGroup.has_action('show-menubar') &&
             !firstGroup.get_action_state('show-menubar').unpack(), 'captured native controls hide');
         passed.push('Real Main, View Options and Current Folder models import with native captions, widget actions and typed targets');
@@ -783,6 +810,35 @@ export default class ShellTestDriver extends Extension {
         assertFilesHeadings();
         GLib.file_set_contents(GLib.build_filenamev([directory, 'native-history.json']), JSON.stringify(historyEvidence, null, 2));
         passed.push('Switching the active native tab retires its history aliases and removes the additional heading');
+        await select(windows[0]);
+        await waitFor(() => binding('win.gnomenu.slot.back')?.actor.sensitive &&
+            binding('win.gnomenu.slot.forward')?.actor.sensitive === false,
+        'navigation controls follow the original tab after closing the temporary tab');
+        const navMenu = menuFor('win.gnomenu.slot.back');
+        navMenu.open(0);
+        await capture('native-navigation.png');
+        navMenu.close(0);
+        const secondNavigation = ['back', 'forward'].map(direction => secondGroup.get_action_enabled(`gnomenu.slot.${direction}`));
+        binding('win.gnomenu.slot.back').actor.activate(null);
+        await waitFor(() => windows[0].title === currentDirectory.get_basename() &&
+            binding('win.gnomenu.slot.forward')?.actor.sensitive, 'Go Back navigates to the actual parent history entry');
+        await waitNavigation();
+        binding('win.gnomenu.slot.forward').actor.activate(null);
+        await waitFor(() => windows[0].title === createdName &&
+            binding('win.gnomenu.slot.forward')?.actor.sensitive === false, 'Go Forward returns to the actual child history entry');
+        await waitNavigation();
+        const unavailable = binding('win.gnomenu.slot.forward').actor._menuLabNode;
+        assert(!extension._source.activate(unavailable), 'A disabled navigation command cannot dispatch');
+        passed.push('Go Back and Forward navigate the active native tab and synchronize disabled states with the toolbar');
+        await select(windows[1]);
+        assert(['back', 'forward'].every((direction, index) =>
+            binding(`win.gnomenu.slot.${direction}`)?.actor.sensitive === secondNavigation[index]),
+        'Focusing the other Files window must import its independent navigation availability');
+        assert(windows[1].title === otherTitle, 'Go navigation must preserve the other window location');
+        await select(windows[0]);
+        assert(windows[0].title === createdName, 'Returning to the first window must retain its location');
+        await waitNavigation();
+        passed.push('Go navigation retains independent availability and locations across two Files windows and focus changes');
         await Main.extensionManager.disableExtension(UUID);
         await waitFor(() => firstGroup.get_action_state('show-menubar')?.unpack() && extension._buttons.length === 0,
             'disable restores the original controls');

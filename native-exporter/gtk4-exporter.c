@@ -909,6 +909,35 @@ static void collect_tab_menu(WindowExport *export, GtkWidget *window, GtkWidget 
     append_files_menu(root, menu_title, G_MENU_MODEL(copy));
 }
 
+static void collect_navigation_button(WindowExport *export, GtkWidget *window, GtkWidget *widget,
+                                       GMenu *root, GString *signature)
+{
+    if (!GTK_IS_BUTTON(widget) || !gtk_widget_get_mapped(widget))
+        return;
+    const char *action = gtk_actionable_get_action_name(GTK_ACTIONABLE(widget));
+    if (g_strcmp0(action, "slot.back") != 0 && g_strcmp0(action, "slot.forward") != 0)
+        return;
+    GtkWidget *controls = gtk_widget_get_parent(widget);
+    while (controls && !g_str_equal(G_OBJECT_TYPE_NAME(controls), "NautilusHistoryControls"))
+        controls = gtk_widget_get_parent(controls);
+    const char *caption = gtk_widget_get_tooltip_text(widget);
+    if (!controls || !caption || !*caption)
+        return;
+    // The two controls supply their actual captions and widget actions. The
+    // layout-only section lets the importer place them in Go without a new
+    // heading. Keep the toolbar navigation controls available locally.
+    g_autofree char *mapped = proxy_name(export, window, widget, action);
+    g_autoptr(GMenuItem) item = g_menu_item_new(caption, NULL);
+    g_menu_item_set_action_and_target_value(item, mapped,
+        gtk_actionable_get_action_target_value(GTK_ACTIONABLE(widget)));
+    g_autoptr(GMenu) navigation = g_menu_new();
+    g_menu_append_item(navigation, item);
+    g_autoptr(GMenuItem) section = g_menu_item_new_section(NULL, G_MENU_MODEL(navigation));
+    g_menu_item_set_attribute(section, "x-gnomenu-layout", "s", "files");
+    g_menu_append_item(root, section);
+    g_string_append_printf(signature, "navigation=%s/%s;", caption, mapped);
+}
+
 static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *widget,
                           GMenu *root, GString *signature, guint depth)
 {
@@ -918,6 +947,7 @@ static void collect_menus(WindowExport *export, GtkWidget *window, GtkWidget *wi
     // Its generated buttons are consumers, never additional native sources.
     if (GTK_IS_POPOVER_MENU_BAR(widget))
         return;
+    collect_navigation_button(export, window, widget, root, signature);
     if (GTK_IS_POPOVER_MENU(widget))
         collect_file_popup(export, window, GTK_POPOVER(widget), root, signature);
     if (GTK_IS_POPOVER_MENU(widget))

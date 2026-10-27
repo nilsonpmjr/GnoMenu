@@ -67,7 +67,7 @@ This downloads a matching Fedora RPM, verifies its signature and extracts the vi
 
 ## Experimental Nautilus exporter
 
-An optional [native Nautilus exporter experiment](docs/native-exporter.md) imports its real toolbar, tab, breadcrumb, file-selection, background and Back/Forward history menu models, including widget actions and local-control restoration. Commands retain their native context; changes to selection, location or active history slot retire the affected snapshots. History uses the native button captions as additional menu headings. It runs only through the private test/demo harness and is not included in the extension ZIP or enabled by the installer.
+An optional [native Nautilus exporter experiment](docs/native-exporter.md) imports its real toolbar, tab, breadcrumb, file-selection, background and Back/Forward history menu models, including widget actions and local-control restoration. It also exposes the native Back/Forward navigation controls under Go, using their actual captions and availability. Commands retain their native context; changes to selection, location or active history slot retire the affected snapshots. History uses the native button captions as additional menu headings. It runs only through the private test/demo harness and is not included in the extension ZIP or enabled by the installer.
 
 Private real-app checks include Copy/Paste and Cut/Paste between two Files windows, plus single-folder Rename through the native filename entry. Renaming also retires commands that still carry the old display name.
 

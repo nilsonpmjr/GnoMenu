@@ -43,6 +43,7 @@ These steps prepare a community extension for the catalog. GNOME approval is a s
 - Native file-selection and background menus are captured after native popup requests. Selection snapshots preserve actual file objects, retire when selection/location/loading changes and ignore redundant notifications. Real-app checks cover Select All, opening one/two selected folders and stale-command retirement; trash/deletion and broad file-type coverage remain pending.
 - Native Copy/Paste and Cut/Paste are verified between two private Files windows with exact marker contents. Single-folder Rename is verified through the actual native entry; display-name changes retire the old context even when the selected object stays the same. Trash/deletion, batch rename and broader file types remain pending.
 - Native Back/Forward history menus appear on demand under their actual button captions. Indexed navigation, popup replacement and retirement on location/active-tab changes are checked in two locales; other private widget menus remain pending.
+- Go Back/Forward use the actual native navigation buttons' captions, actions and enabled states, without requiring a popup. Real navigation, disabled-command rejection and independent state across two windows are checked in two locales.
 - Export original local menu models and their widget actions from applications that currently keep them private, starting with Nautilus/Ptyxis.
 - Prove the association between DBusMenu registrations and actual Mutter windows.
 - Investigate Signal and Obsidian exporters and Flatpak bus policies.

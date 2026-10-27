@@ -17,6 +17,8 @@ const target = text => ({print: () => text});
 const tree = [menu('Current Folder Menu', [
     item('paste', 'win.gnomenu.view.paste', 'Paste'),
     item('reload', 'win.gnomenu.slot.reload', 'Reload'),
+    item('back', 'win.gnomenu.slot.back', 'Native Back'),
+    item('forward', 'win.gnomenu.slot.forward', 'Native Forward'),
     item('unknown', 'win.gnomenu.view.extension-custom', 'Original Extension Entry'),
 ]), menu('Main Menu', [
     item('prefs', 'app.preferences', 'Native Preferences'), item('help', 'app.help', 'Native Help'),
@@ -44,7 +46,7 @@ const edit = all(organized.tree[1].children);
 assert(!edit.some(node => node.id === 'paste') && edit.some(node => node.id === 'context-paste'),
     'Context-scoped action must replace the duplicate general action');
 assert(edit.find(node => node.id === 'context-copy').contextLabel === 'selected_file', 'Target identity survives placement');
-assert(!tree[3].children[0].contextLabel && tree[0].children.length === 3, 'Input model must remain unchanged');
+assert(!tree[3].children[0].contextLabel && tree[0].children.length === 5, 'Input model must remain unchanged');
 print('PASS: Deduplication retains captured context actions and leaves original native models unchanged');
 const view = all(organized.tree[2].children);
 const sort = view.find(node => node.label === 'Sort');
@@ -52,6 +54,8 @@ assert(sort.children.length === 2 && sort.children[0].target === tree[2].childre
     'Nested sorting and typed target objects must be preserved');
 assert(all(organized.tree[3].children).some(node => node.label === 'ancestor_folder'),
     'Clicked ancestor remains identifiable inside Go');
+assert(all(organized.tree[3].children).slice(0, 2).map(node => node.label).join('|') === 'Native Back|Native Forward',
+    'Navigation controls retain native captions and precede contextual navigation entries in Go');
 print('PASS: Original nested menus, ancestor identity and distinct typed targets survive regrouping');
 const translated = organizeFilesMenus([], [], lookup, text => `translated:${text}`);
 assert(translated.tree.map(node => node.label).join('|') ===

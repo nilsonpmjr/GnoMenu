@@ -37,6 +37,7 @@ names = set()
 dialogs = []
 entries = []
 tab_details = []
+buttons = []
 visited = 0
 
 
@@ -53,6 +54,10 @@ def walk(node, depth=0):
             name = node.get_name()
             if name:
                 names.add(name)
+            if name and role == Atspi.Role.PUSH_BUTTON:
+                states = node.get_state_set()
+                buttons.append({'name': name, 'enabled': states.contains(Atspi.StateType.ENABLED),
+                                'sensitive': states.contains(Atspi.StateType.SENSITIVE)})
             if role == Atspi.Role.DIALOG:
                 dialogs.append(name)
             if node.get_state_set().contains(Atspi.StateType.EDITABLE):
@@ -82,4 +87,4 @@ def walk(node, depth=0):
 walk(found)
 print(json.dumps({'found': True, 'frames': frames, 'visibleTabEntries': max([len(tabs), *lists]),
                   'tabLists': lists, 'tabs': tabs, 'names': sorted(names), 'dialogs': dialogs,
-                  'tabDetails': tab_details, 'entries': entries}, ensure_ascii=False))
+                  'tabDetails': tab_details, 'entries': entries, 'buttons': buttons}, ensure_ascii=False))

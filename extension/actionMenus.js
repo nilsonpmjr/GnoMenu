@@ -75,7 +75,7 @@ export function organizeFilesMenus(tree, applicationMenu, resolve, translate) {
         ...['view.sort', 'view.zoom-in', 'view.zoom-out', 'view.show-hidden-files', 'view.visible-columns',
             'view.visible-captions', 'win.toggle-sidebar', 'app.show-file-transfers'].map(action => [action, 'view']),
         ...['win.go-home', 'win.tab-move-left', 'win.tab-move-right', 'win.tab-move-new-window',
-            'slot.reload', 'slot.stop', 'slot.bookmark-current-directory', 'slot.unbookmark-current-directory',
+            'slot.back', 'slot.forward', 'slot.reload', 'slot.stop', 'slot.bookmark-current-directory', 'slot.unbookmark-current-directory',
             'slot.star-current-directory', 'slot.unstar-current-directory', 'view.current-directory-console']
             .map(action => [action, 'go']),
         ...['app.help', 'app.shortcuts'].map(action => [action, 'help']),
@@ -181,7 +181,7 @@ export function organizeFilesMenus(tree, applicationMenu, resolve, translate) {
             'win.close-current-view', 'win.close-other-tabs'],
         edit: ['win.undo', 'win.redo'],
         view: ['win.toggle-sidebar', 'app.show-file-transfers'],
-        go: ['win.go-home', 'win.tab-move-left', 'win.tab-move-right', 'win.tab-move-new-window'],
+        go: ['win.go-home', 'slot.back', 'slot.forward', 'win.tab-move-left', 'win.tab-move-right', 'win.tab-move-new-window'],
         help: ['app.help', 'app.shortcuts'],
     };
     for (const [name, entries] of Object.entries(groups)) {
