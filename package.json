@@ -4,7 +4,7 @@
   "type": "module",
   "license": "GPL-3.0-or-later",
   "scripts": {
-    "lint": "eslint extension tests/*.js tests/shell-driver"
+    "lint": "eslint extension tests && node --check fixtures/electron-menu/main.cjs"
   },
   "devDependencies": {
     "eslint": "10.13.0"

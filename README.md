@@ -19,6 +19,8 @@ See the [completion plan](docs/completion-plan.md) for what remains before a pub
 | Signal, Obsidian, Firefox | Compatibility work remains |
 | DBusMenu | Transport, registrar and declared-ID discovery tested in isolation; not connected to the panel |
 
+The [controlled Electron replay](docs/electron-replay.md) verifies actual XWayland export and command routing in our own fixture, and records native Wayland/checkbox limitations. It does not establish Signal or Obsidian support.
+
 Original exported menus normally retain their order, nesting, labels and action targets. The experimental Nautilus integration uses **Files · File · Edit · View · Go · Help** as base categories for captured toolbar/context commands. Additional native menubar menus retain their own headings and nesting before Help, appearing and disappearing with the exported context. Native command labels, typed targets and contextual guards are preserved. An action inventory alone does not describe a menu, so GnoMenu does not generate item captions or a catch-all menu from unplaced action names. See [compatibility and limitations](docs/compatibility.md). A **Partial menu** label identifies the explicit Nautilus/Ptyxis adapters; these are not complete imports of their local menus.
 
 ## Desktop and local menus

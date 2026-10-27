@@ -50,6 +50,7 @@ These steps prepare a community extension for the catalog. GNOME approval is a s
 - Export original local menu models and their widget actions from applications that currently keep them private, starting with Nautilus/Ptyxis.
 - Prove the association between DBusMenu registrations and actual Mutter windows.
 - Investigate Signal and Obsidian exporters and Flatpak bus policies.
+- Controlled Electron 43.8.3 replay proves separate XWayland menu paths, lazy submenu preparation, scoped invocation, dynamic commands and source disposal using our own fixture. Native Wayland registration and checkbox advertisement have recorded gaps; actual Signal/Obsidian packages and automatic panel association remain unverified. See `docs/electron-replay.md`.
 - Investigate the installed Firefox build separately.
 - Extend Nautilus/Ptyxis coverage to commands not currently exported.
 - Test additional application versions and package formats.

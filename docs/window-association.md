@@ -18,7 +18,7 @@ The declared-ID resolver therefore remains outside the installed panel integrati
 
 ## Next experiment
 
-Use real XWayland windows with identical titles and the same PID to prove identity independently of application naming. Investigate metadata published by the actual Signal and Obsidian exporters in parallel.
+The [controlled Electron replay](electron-replay.md) now uses two actual XWayland windows with identical titles and the same PID. Their native handles match distinct registrar entries, and the existing discovery/transport pipeline routes real commands independently. Meta internal IDs differ from those XIDs, and the objects do not expose `get_xwindow`. Description strings are retained as observations only. Production discovery remains outside the installed panel integration until a suitable association path is established.
 
 The [installed Electron/Flatpak investigation](electron-compatibility.md) confirms static Electron menu construction and records sandbox declarations. The read-only probe can find instance-specific owned names, but those names still do not establish a Mutter window association. No new DBusMenu panel integration is claimed by that diagnostic.
 
