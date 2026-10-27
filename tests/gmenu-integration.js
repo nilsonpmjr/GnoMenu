@@ -118,6 +118,26 @@ async function run() {
     assert(second.activate(find(second, 'Increment window 2')), 'Second window must dispatch');
     await waitFor(() => group2.get_action_state('counter').unpack() === 1, 'second window action');
     print('PASS: actions reach only their bound window');
+    const layout = new GMenuSource(bus, {busName: owner, menuPath: '/lab/menu/files_layout',
+        appPath: '/lab/app', windowPath: '/lab/window/1', applicationId: 'org.gnome.Nautilus'}, () => {});
+    sources.push(layout);
+    await waitFor(() => find(layout, 'Increment window 1')?.enabled &&
+        layout._groups.get('app').has_action('toggle-native-context'), 'marked Files layout loads');
+    const headings = () => layout.snapshot.map(node => node.label).join('|');
+    assert(headings() === 'File|Edit|View|Go|Help', 'Base Files layout remains available');
+    layout._groups.get('app').activate_action('toggle-native-context', null);
+    await waitFor(() => find(layout, 'Native context mode')?.enabled, 'additional native menu arrives over D-Bus');
+    assert(headings() === 'File|Edit|View|Go|_Tools|Help', 'Additional native menu is inserted before Help');
+    const context = find(layout, 'Native context mode');
+    assert(layout.activate(context), 'Additional native command dispatches');
+    await waitFor(() => group1.get_action_state('mode').unpack() === 'two', 'typed context target reaches the first window');
+    assert(group2.get_action_state('mode').unpack() === 'one', 'Additional native command keeps exact window scope');
+    group1.change_action_state('mode', new GLib.Variant('s', 'one'));
+    layout._groups.get('app').activate_action('toggle-native-context', null);
+    await waitFor(() => !find(layout, 'Native context mode'), 'removed native context disappears');
+    assert(headings() === 'File|Edit|View|Go|Help' && !layout.activate(context),
+        'Removing the native menu retires its command and restores the base layout');
+    print('PASS: live native context menus appear, dispatch typed targets to their window and retire after removal');
     const actionsOnly = new GMenuSource(bus, {busName: owner, menuPath: null,
         appPath: '/lab/app', windowPath: '/lab/window/1', applicationId: 'org.gnome.Nautilus'}, () => {});
     sources.push(actionsOnly);
@@ -243,6 +263,7 @@ async function run() {
 }
 
 run().catch(error => {
+    printerr(error.message);
     printerr(error.stack);
     failure = true;
 }).finally(() => {

@@ -54,12 +54,14 @@ export function actionMenus(applicationId, resolve, translate) {
 }
 
 // Presentation policy for our Nautilus exporter. Keep its captured action
-// objects and typed targets; only place them in the established Files headings.
+// objects and typed targets. The established headings are a base, not a limit:
+// additional native menubar menus keep their own identity and hierarchy.
 export function organizeFilesMenus(tree, applicationMenu, resolve, translate) {
     const _ = translate;
     const labels = {file: _('File'), edit: _('Edit'), view: _('View'), go: _('Go'), help: _('Help')};
     const groups = Object.fromEntries(Object.keys(labels).map(key => [key, []]));
     const app = [];
+    const additional = [];
     const canonical = action => action
         .replace(/^win\.gnomenu\.files\.\d+\./, '')
         .replace(/^win\.gnomenu\.tab\.\d+\./, 'win.')
@@ -107,10 +109,39 @@ export function organizeFilesMenus(tree, applicationMenu, resolve, translate) {
     choose([...tree, ...applicationMenu, ...fallback]);
     const emitted = new Set();
     const contextual = node => /^win\.gnomenu\.(files|tab|pathbar)\./.test(node.action) || node.children.some(contextual);
-    const split = (nodes, top = false, contextLabel = '') => {
+    const retain = nodes => nodes.flatMap(node => {
+        if (node.kind === 'section' || node.kind === 'submenu') {
+            const children = retain(node.children);
+            return children.length ? [{...node, children}] : [];
+        }
+        if (node.action) {
+            if (winners.get(key(node)) !== node || emitted.has(key(node)))
+                return [];
+            emitted.add(key(node));
+        }
+        return [{...node}];
+    });
+    const heading = text => text.replace(/__|_/g, match => match === '__' ? '_' : '').trim().toLocaleLowerCase();
+    const categoryForHeading = text => Object.keys(labels).find(name =>
+        [name, labels[name]].some(label => heading(label) === heading(text)));
+    const split = (nodes, top = false, contextLabel = '', nativeMenubar = false) => {
         const result = Object.fromEntries([...Object.keys(labels), 'app'].map(name => [name, []]));
         for (const node of nodes) {
             if (node.kind === 'section' || node.kind === 'submenu') {
+                // Only the exporter's marked toolbar/context wrappers are
+                // redistributed. A genuine native menubar supplies placement.
+                if (top && nativeMenubar && node.kind === 'submenu' && node.label.trim() &&
+                    node.layout !== 'files' && !node.id.startsWith('actions/')) {
+                    const children = retain(node.children);
+                    if (children.length) {
+                        const category = categoryForHeading(node.label);
+                        if (category)
+                            result[category].push(...children);
+                        else
+                            additional.push({...node, children});
+                    }
+                    continue;
+                }
                 const children = split(node.children, false, top && contextual(node) ? node.label : contextLabel);
                 for (const [name, entries] of Object.entries(children)) {
                     if (!entries.length)
@@ -140,7 +171,7 @@ export function organizeFilesMenus(tree, applicationMenu, resolve, translate) {
         return result;
     };
     for (const nodes of [tree, applicationMenu, fallback]) {
-        const fragments = split(nodes, true);
+        const fragments = split(nodes, true, '', nodes === tree);
         for (const name of Object.keys(labels))
             groups[name].push(...fragments[name]);
         app.push(...fragments.app);
@@ -161,10 +192,10 @@ export function organizeFilesMenus(tree, applicationMenu, resolve, translate) {
         entries.sort((a, b) => rank(a) - rank(b));
     }
     return {
-        tree: Object.entries(labels).map(([name, label]) => ({
+        tree: Object.entries(labels).flatMap(([name, label]) => [...(name === 'help' ? additional : []), {
             id: `files/menu/${name}`, kind: 'submenu', label, children: groups[name],
             action: '', target: null, enabled: true, toggle: null,
-        })),
+        }]),
         applicationMenu: app,
     };
 }

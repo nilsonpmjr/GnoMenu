@@ -11,7 +11,7 @@ The long-term goal is broad global-menu support across system applications and c
 - Standard exported preferences/about/quit actions as a fallback.
 - Partial action menus for Nautilus 50.4 and Ptyxis 50.1.
 - Generic native imports preserve menu order, hierarchy, labels and targets; unplaced action identifiers do not create new menus.
-- Nautilus keeps the established app-name/File/Edit/View/Go/Help layout. Captured commands join the matching categories, with native labels, typed targets and context guards; repeated actions prefer their captured context over the general fallback.
+- Nautilus uses app-name/File/Edit/View/Go/Help as base categories. Captured toolbar/context commands join the matching categories, with native labels, typed targets and context guards; additional native menubar menus retain their own headings and follow context changes. Repeated actions prefer their captured context over the general fallback.
 - Every focused app retains its name, including apps without captured commands; Files is the desktop fallback.
 - Files categories remain on the desktop after the last window closes; launchers work and window-dependent actions are disabled.
 - Reversible local-menubar ownership through exported window visibility actions.

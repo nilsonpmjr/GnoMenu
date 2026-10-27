@@ -17,7 +17,7 @@ Application menus in the GNOME top bar, with the application name first.
 | Signal, Obsidian, Firefox | Compatibility work remains |
 | DBusMenu | Transport, registrar and declared-ID discovery tested in isolation; not connected to the panel |
 
-Original exported menus normally retain their order, nesting, labels and action targets. The experimental Nautilus integration keeps the established **Files · File · Edit · View · Go · Help** layout and places captured commands into those categories. Native command labels, typed targets and contextual guards are preserved. An action inventory alone does not describe a menu, so GnoMenu does not generate item captions or a catch-all menu from unplaced action names. See [compatibility and limitations](docs/compatibility.md). A **Partial menu** label identifies the explicit Nautilus/Ptyxis adapters; these are not complete imports of their local menus.
+Original exported menus normally retain their order, nesting, labels and action targets. The experimental Nautilus integration uses **Files · File · Edit · View · Go · Help** as base categories for captured toolbar/context commands. Additional native menubar menus retain their own headings and nesting before Help, appearing and disappearing with the exported context. Native command labels, typed targets and contextual guards are preserved. An action inventory alone does not describe a menu, so GnoMenu does not generate item captions or a catch-all menu from unplaced action names. See [compatibility and limitations](docs/compatibility.md). A **Partial menu** label identifies the explicit Nautilus/Ptyxis adapters; these are not complete imports of their local menus.
 
 ## Desktop and local menus
 

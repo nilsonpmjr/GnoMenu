@@ -6,7 +6,7 @@ This is a working experiment for the native RPM application. It is outside the i
 
 ## Files layout
 
-The panel keeps **Files · File · Edit · View · Go · Help**, matching the established layout. Capturing a window adds its commands to those categories instead of introducing Current Folder Menu, View Options, Main Menu or filename headings in the panel.
+The panel uses **Files · File · Edit · View · Go · Help** as its base layout. Capturing a window places toolbar/context commands into those categories instead of introducing Current Folder Menu, View Options, Main Menu or filename headings in the panel. This is not a closed list: additional native menubar menus keep their actual names and nesting before Help and follow the exported context's lifetime. Native menus matching a base category join it. Empty or fully duplicated extra menus are omitted; no generic commands heading is invented.
 
 - The app name contains native preferences, about and quit actions.
 - File contains window/tab operations, opening, folder creation, properties and file operations such as rename.
@@ -70,7 +70,7 @@ The harness creates a private bus, compositor, settings and temporary folders. I
 
 1. The library observes the public `gtk_widget_insert_action_group()` calls and records their original widget and namespace. No private GTK struct offsets are used.
 2. During application startup, it installs a stable GMenu container before windows publish their GTK D-Bus metadata. An existing application menubar is left to its original exporter.
-3. It locates the three supported native menu models on their real menu buttons. Source captions come from the native tooltips. Item labels, sections, targets and nesting come from the original GMenu models. The native zoom custom slots use their actual buttons' tooltips and actions. A model marker selects the fixed Files presentation in the extension.
+3. It locates the three supported native menu models on their real menu buttons. Source captions come from the native tooltips. Item labels, sections, targets and nesting come from the original GMenu models. The native zoom custom slots use their actual buttons' tooltips and actions. A model marker selects redistribution into the base Files categories in the extension; additional unmarked native menubar menus retain their own headings.
 4. Widget actions get forwarding aliases in the corresponding `GtkApplicationWindow` action map. For example, `view.sort` becomes `win.gnomenu.view.sort`; its original `(sb)` target and state are retained. Invocation resolves the current original group inside that same window, validates the parameter and checks its enabled state.
 5. The ordinary GnoMenu GMenu importer reads the standard GTK menu path and exact window action path. No title/PID matching or new Shell-side protocol is required.
 
@@ -104,7 +104,7 @@ The sixth iteration captures the actual selection/background models when Nautilu
 
 Each popup gets a new action namespace, such as `win.gnomenu.files.4.view.open-item-new-tab`. The capture holds the selected file objects and location, and refers weakly to the native view/popup. Invocation checks the current location, loading state, exact ordered selection and current popup identity before reaching the original action group. Effective changes retire the capture; selecting the same files again does not revive a retired generation. Redundant notifications that leave the full context unchanged do not retire it. A new popup request replaces the previous context.
 
-Selection context labels use the native display names, joined with commas for multiple files; background labels use the actual native window title. They are retained as command context metadata while the panel headings stay fixed. Literal underscores remain literal. The current limit is 128 selected objects; larger selections are left to the local menu. Command labels, nested menus, parameters and availability come from the original GMenu/GAction models, including the original rules for hiding unavailable commands. The explicit Files presentation determines their category.
+Selection context labels use the native display names, joined with commas for multiple files; background labels use the actual native window title. They are retained as command context metadata within the base categories. Literal underscores remain literal. The current limit is 128 selected objects; larger selections are left to the local menu. Command labels, nested menus, parameters and availability come from the original GMenu/GAction models, including the original rules for hiding unavailable commands. The explicit Files presentation determines their category.
 
 The native context popups remain available. Capture requires a native popup request, and a changed context requires reopening it. This establishes the model families, not full validation of every command, file type or extension-provided menu.
 
@@ -122,7 +122,7 @@ If a supported model disappears or cannot resolve its actions, the exporter rest
 
 Observed environment: Nautilus `50.4-1.fc44`, GTK `4.22.5-2.fc44`, GNOME Shell `50.6-1.fc44`, Wayland on Bazzite 44.
 
-Forty check groups cover the two locale sessions, alongside four focused layout checks:
+Forty check groups cover the two locale sessions, alongside six focused layout checks and a live D-Bus test of additional menu arrival, typed command dispatch to the exact window, removal and stale-command rejection. Additional native menu support is exercised with controlled models; the current real Nautilus capture still covers the sources listed above.
 
 - Original Main Menu/View Options/Current Folder Menu models, native custom zoom entries and tuple targets are imported.
 - Show Hidden Files reveals a real hidden test file. Nautilus intentionally shares this preference across its windows; the exporter preserves that behavior.

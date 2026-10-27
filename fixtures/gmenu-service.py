@@ -91,6 +91,26 @@ for number in (1, 2):
     menus.extend([root, file_menu, section])
     registrations.append(bus.export_action_group(f'/lab/window/{number}', group))
     registrations.append(bus.export_menu_model(f'/lab/menu/{number}', root))
+    if number == 1:
+        layout = Gio.Menu()
+        wrapper = Gio.MenuItem.new_submenu('Main Menu', file_menu)
+        wrapper.set_attribute_value('x-gnomenu-layout', GLib.Variant('s', 'files'))
+        layout.append_item(wrapper)
+        action(group, 'context-mode', lambda _, value, mode=mode: mode.set_state(value), parameter='s')
+        tools = Gio.Menu()
+        tools.append('Native context mode', 'win.context-mode::two')
+        nested = Gio.Menu()
+        nested.append_submenu('Native context submenu', tools)
+
+        def toggle_context(*_args):
+            if layout.get_n_items() > 1:
+                layout.remove(1)
+            else:
+                layout.append_submenu('_Tools', nested)
+
+        action(app, 'toggle-native-context', toggle_context)
+        menus.extend([layout, tools, nested])
+        registrations.append(bus.export_menu_model('/lab/menu/files_layout', layout))
 registrations.append(bus.export_action_group('/lab/app', app))
 registrations.append(bus.export_action_group('/org/gnome/Nautilus', app))
 print(json.dumps({'owner': bus.get_unique_name()}), flush=True)

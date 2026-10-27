@@ -28,6 +28,8 @@ const tree = [menu('Current Folder Menu', [
     item('context-paste', 'win.gnomenu.files.7.view.paste', 'Native Paste'),
     item('context-copy', 'win.gnomenu.files.7.view.copy', 'Native Copy'),
 ]), menu('ancestor_folder', [item('ancestor', 'win.gnomenu.pathbar.4.properties', 'Properties')])];
+for (const node of tree)
+    node.layout = 'files';
 const organized = organizeFilesMenus(tree, [], lookup, text => text);
 assert(organized.tree.map(node => node.label).join('|') === 'File|Edit|View|Go|Help', 'Stable headings');
 assert(organized.applicationMenu.some(node => node.action === 'app.preferences'), 'Settings belong to the app heading');
@@ -54,8 +56,40 @@ print('PASS: Original nested menus, ancestor identity and distinct typed targets
 const translated = organizeFilesMenus([], [], lookup, text => `translated:${text}`);
 assert(translated.tree.map(node => node.label).join('|') ===
     'translated:File|translated:Edit|translated:View|translated:Go|translated:Help', 'Use the session translator');
-const scoped = organizeFilesMenus([menu('tab', [item('scoped-close', 'win.gnomenu.tab.3.close-current-view')])], [],
+const scoped = organizeFilesMenus([{...menu('tab', [item('scoped-close', 'win.gnomenu.tab.3.close-current-view')]), layout: 'files'}], [],
     node => ({exists: node.action === 'win.close-current-view', acceptsTarget: true}), text => text);
 assert(all(scoped.tree).filter(node => node.action?.endsWith('close-current-view')).length === 1 &&
     all(scoped.tree).some(node => node.id === 'scoped-close'), 'Native tab context wins over fallback');
 print('PASS: Localized headings stay stable and contextual tab actions take priority over window fallbacks');
+
+const tools = menu('_Tools', [menu('Native submenu', [item('tool', 'win.plugin-tool', 'Native Tool', target("'native'"))])]);
+const dynamicTree = [...tree, tools, menu('Empty context', [])];
+const expanded = organizeFilesMenus(dynamicTree, [], lookup, text => text);
+assert(expanded.tree.map(node => node.label).join('|') === 'File|Edit|View|Go|_Tools|Help',
+    'Additional native menus appear before Help without displacing the established categories');
+const imported = expanded.tree.find(node => node.label === '_Tools');
+assert(imported.children[0].label === 'Native submenu' && imported.children[0].children[0].target === tools.children[0].children[0].target,
+    'Additional menus retain native hierarchy and typed targets');
+assert(!expanded.tree.some(node => node.label === 'Empty context'), 'Do not add an empty context menu');
+assert(!organizeFilesMenus(tree, [], lookup, text => text).tree.some(node => node.label === '_Tools'),
+    'Removing native context removes its heading');
+assert(!tools.children[0].children[0].contextLabel, 'Additional native model remains unchanged');
+print('PASS: Additional native context menus appear and disappear with their original hierarchy and typed targets');
+
+const nativeEdit = menu('_Edit', [item('custom-edit', 'win.custom-edit', 'Native Edit Operation')]);
+const extended = organizeFilesMenus([...tree, nativeEdit], [], lookup, text => text);
+assert(extended.tree.length === 5 && all(extended.tree[1].children).some(node => node.id === 'custom-edit'),
+    'A native standard category merges into that category even for unknown actions');
+const duplicates = menu('Tools', [item('duplicate-copy', 'win.gnomenu.view.copy', 'Copy'),
+    item('distinct-tool', 'win.plugin-tool', 'Native Tool')]);
+const deduplicated = organizeFilesMenus([...tree, duplicates], [], lookup, text => text);
+assert(all(deduplicated.tree.find(node => node.label === 'Tools').children).length === 1,
+    'Captured contextual action still wins over an additional menu duplicate');
+const localizedExtra = organizeFilesMenus([...tree, menu('Ferramentas', [item('local', 'win.local')])], [], lookup,
+    text => `translated:${text}`);
+assert(localizedExtra.tree.at(-2).label === 'Ferramentas', 'Native extra heading is not retranslated');
+const appNested = organizeFilesMenus(tree, [menu('Application settings', [item('app-setting', 'app.settings')])],
+    lookup, text => text);
+assert(appNested.tree.length === 5 && all(appNested.applicationMenu).some(node => node.action === 'app.settings'),
+    'Application-menu nesting remains under the app name rather than adding a menubar heading');
+print('PASS: Native standard headings merge, contextual deduplication holds and additional captions stay in their source language');
