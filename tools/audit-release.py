@@ -18,7 +18,7 @@ args = parser.parse_args()
 metadata = json.loads((root / 'extension/metadata.json').read_text())
 bundle = root / f'build/{metadata["uuid"]}.shell-extension.zip'
 required = {'metadata.json', 'extension.js', 'gmenuSource.js', 'windowSource.js',
-            'actionMenus.js', 'stylesheet.css', 'COPYING'}
+            'actionMenus.js', 'filesDesktopSource.js', 'stylesheet.css', 'COPYING'}
 catalogs = {f'locale/{path.stem}/LC_MESSAGES/gnomenu.mo' for path in (root / 'po').glob('*.po')}
 errors = []
 blockers = []

@@ -220,6 +220,24 @@ export default class ShellTestDriver extends Extension {
         binding('win.close-current-view').actor.activate(null);
         await waitObserved(desktopTarget, state => state.visibleTabEntries === beforeDesktop.visibleTabEntries);
         passed.push('Desktop retains Files identity and New Tab reaches the remembered Files window');
+        for (const window of nautilus)
+            window.delete(global.get_current_time());
+        await waitFor(() => windowsFor('org.gnome.Nautilus').length === 0 &&
+            !global.display.focus_window && extension._desktopMode &&
+            extension._source === extension._desktopSource && extension._buttons.length === 6,
+        'closing every Files window retains its desktop menu headings');
+        assert(JSON.stringify(extension._buttons.map(button => button.get_first_child().text)) ===
+            JSON.stringify(expectedHeadings), 'Windowless desktop must keep the same Files headings');
+        assert(binding('app.new-window')?.actor.sensitive && binding('win.go-home')?.actor.sensitive,
+            'Windowless Files must expose its launchers in File and Go');
+        assert(!binding('win.new-tab')?.actor.sensitive && !binding('win.close-current-view')?.actor.sensitive &&
+            !binding('win.undo')?.actor.sensitive && !binding('app.clone-window')?.actor.sensitive,
+        'Window-only commands must stay disabled without a Files window');
+        await waitFor(() => Main.wm._destroying.size === 0, 'Files closing animations finish');
+        extension._buttons[1].menu.open(0);
+        await screenshot('files-desktop-no-window.png');
+        extension._buttons[1].menu.close(0);
+        passed.push('Desktop keeps all Files categories after the last window closes, with window actions disabled');
         const current = extension._source;
         await Main.extensionManager.disableExtension(UUID);
         await waitFor(() => current.closed && extension._buttons.length === 0, 'real app cleanup');

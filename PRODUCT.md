@@ -12,6 +12,7 @@ The long-term goal is broad global-menu support across system applications and c
 - Partial action menus for Nautilus 50.4 and Ptyxis 50.1.
 - Native imports preserve menu order, hierarchy, labels and targets; unplaced action identifiers do not create new menus.
 - Every focused app retains its name, including apps without captured commands; Files is the desktop fallback.
+- Files categories remain on the desktop after the last window closes; launchers work and window-dependent actions are disabled.
 - Reversible local-menubar ownership through exported window visibility actions.
 - Exact window-scoped commands, source disposal and stale-response handling.
 - Leading-edge dropdown placement, RTL behavior and monitor-edge containment.

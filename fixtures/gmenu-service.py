@@ -32,6 +32,7 @@ action(app, 'preferences', lambda *_: preferences_count.set_state(
     GLib.Variant('i', preferences_count.get_state().unpack() + 1)))
 action(app, 'settings')
 action(app, 'new-window', parameter='s')  # Incompatible with the adapter's no-arg command.
+action(app, 'clone-window')  # Application-scoped, but still needs a client window.
 action(app, 'about', parameter='s')  # Must not be guessed without its parameter.
 application_menu = Gio.Menu()
 application_menu.append('Native settings label', 'app.preferences')
@@ -91,6 +92,7 @@ for number in (1, 2):
     registrations.append(bus.export_action_group(f'/lab/window/{number}', group))
     registrations.append(bus.export_menu_model(f'/lab/menu/{number}', root))
 registrations.append(bus.export_action_group('/lab/app', app))
+registrations.append(bus.export_action_group('/org/gnome/Nautilus', app))
 print(json.dumps({'owner': bus.get_unique_name()}), flush=True)
 loop.run()
 bus.close_sync(None)

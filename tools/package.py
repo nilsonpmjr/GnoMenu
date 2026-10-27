@@ -18,7 +18,7 @@ subprocess.run([sys.executable, str(root / 'tools/build-translations.py')], chec
 metadata = json.loads((root / 'extension/metadata.json').read_text())
 bundle = build / f'{metadata["uuid"]}.shell-extension.zip'
 runtime = ('metadata.json', 'extension.js', 'gmenuSource.js', 'windowSource.js',
-           'actionMenus.js', 'stylesheet.css')
+           'actionMenus.js', 'filesDesktopSource.js', 'stylesheet.css')
 sources = {name: (root / 'extension' / name).read_bytes() for name in runtime}
 sources['COPYING'] = (root / 'COPYING').read_bytes()
 for catalog in sorted((root / 'po').glob('*.po')):

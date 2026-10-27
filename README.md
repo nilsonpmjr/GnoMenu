@@ -21,7 +21,9 @@ Original exported menus retain their order, nesting, labels and action targets. 
 
 ## Desktop and local menus
 
-Every focused application keeps its own name in the panel, including applications without captured commands. When no app has focus, GnoMenu shows Files. Its menus stay bound to the last active Nautilus window, including when the windows are minimized. If no Files window is available, the desktop's Files heading offers New Window and Home launchers. Without an installed Files application, the desktop heading reads Desktop.
+Every focused application keeps its own name in the panel, including applications without captured commands. When no app has focus, GnoMenu shows Files. Its menus stay bound to the last active Nautilus window, including when the windows are minimized. With no Files window open, the same File, Edit, View, Go and Help categories remain visible. New Window and Home work as launchers; window-dependent commands stay disabled. Application commands such as Preferences remain available while Files publishes them. The extension does not start Files automatically or create hidden windows. Without an installed Files application, the desktop heading reads Desktop.
+
+![Files categories remain on the desktop after its last window closes](docs/images/files-desktop.png)
 
 An imported native menubar is hidden locally when the application exports a boolean window action named `show-menubar`, `show-menu-bar` or `menubar-visible`. Its original state is restored when capture ends or GnoMenu is disabled. Partial adapters and applications without that control retain their local menus. GNOME/Wayland does not provide a general way to remove arbitrary GTK4 or Electron controls from another application.
 

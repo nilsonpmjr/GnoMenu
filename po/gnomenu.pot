@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: GnoMenu 0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-26 22:14-0300\n"
+"POT-Creation-Date: 2026-10-26 22:37-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,61 +17,57 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension/extension.js:56 extension/extension.js:179
+#: extension/extension.js:57 extension/extension.js:188
 msgid "No menu available"
 msgstr ""
 
-#: extension/extension.js:179
+#: extension/extension.js:188
 msgid "Some menu items could not be displayed"
 msgstr ""
 
-#: extension/extension.js:230
+#: extension/extension.js:239
 msgid "Desktop"
 msgstr ""
 
-#: extension/extension.js:253
+#: extension/extension.js:262
 msgid "More"
 msgstr ""
 
-#: extension/extension.js:256
+#: extension/extension.js:265
 msgid "Menu"
 msgstr ""
 
-#: extension/extension.js:259 extension/actionMenus.js:13
-#: extension/actionMenus.js:35
-msgid "New Window"
-msgstr ""
-
-#: extension/extension.js:260 extension/actionMenus.js:24
-msgid "Home"
-msgstr ""
-
-#: extension/extension.js:264
+#: extension/extension.js:269
 msgid "Application actions unavailable"
 msgstr ""
 
-#: extension/extension.js:267
+#: extension/extension.js:272
 msgid "Partial menu"
 msgstr ""
 
-#: extension/extension.js:272
+#: extension/extension.js:277
 msgid "Incomplete menu"
 msgstr ""
 
-#: extension/gmenuSource.js:146 extension/gmenuSource.js:147
+#: extension/gmenuSource.js:148 extension/gmenuSource.js:149
+#: extension/filesDesktopSource.js:80
 msgid "Preferences…"
 msgstr ""
 
-#: extension/gmenuSource.js:147
+#: extension/gmenuSource.js:149 extension/filesDesktopSource.js:80
 msgid "About…"
 msgstr ""
 
-#: extension/gmenuSource.js:147
+#: extension/gmenuSource.js:149 extension/filesDesktopSource.js:80
 msgid "Quit"
 msgstr ""
 
 #: extension/actionMenus.js:12 extension/actionMenus.js:34
 msgid "File"
+msgstr ""
+
+#: extension/actionMenus.js:13 extension/actionMenus.js:35
+msgid "New Window"
 msgstr ""
 
 #: extension/actionMenus.js:13 extension/actionMenus.js:35
@@ -120,6 +116,10 @@ msgstr ""
 
 #: extension/actionMenus.js:24
 msgid "Go"
+msgstr ""
+
+#: extension/actionMenus.js:24
+msgid "Home"
 msgstr ""
 
 #: extension/actionMenus.js:25

@@ -26,7 +26,9 @@ Selection commands, copy/paste and other internal commands may remain available 
 
 Every focused app retains its own name, even when it exports no compatible commands. Such an app displays a localized unavailable status and never inherits Files commands or launchers.
 
-On the desktop, with no app focused, the panel shows the last active Files window and retains its exact D-Bus window paths. Commands continue to reach that Files window. An installed Files application with no window supplies New Window and Home launchers instead. Without Files installed, the desktop panel shows Desktop. The extension's own name is never the desktop title.
+On the desktop, with no app focused, the panel shows the last active Files window and retains its exact D-Bus window paths. Commands continue to reach that Files window. When every Files window closes, File, Edit, View, Go and Help remain visible using the same partial adapter. New Window and Home invoke launchers; window-dependent commands such as New Tab, Close Tab and Undo remain disabled. Published application commands can still run without a client window. If Files stops, its application commands become disabled while the categories and launchers remain. No process is started or hidden window created automatically.
+
+This persistent desktop layout is the existing explicit partial adapter, not a newly exported native menu model. Without Files installed, the desktop panel shows Desktop. The extension's own name is never the desktop title.
 
 ## Local-menu ownership
 
@@ -36,7 +38,7 @@ This is verified with the real GTK fixture's `Gtk.ApplicationWindow.show-menubar
 
 GTK4 deprecated [`gtk-shell-shows-menubar`](https://docs.gtk.org/gtk4/property.Settings.gtk-shell-shows-menubar.html) in 4.20 as no longer relevant. Mutter 50.6's [GTK shell implementation](https://github.com/GNOME/mutter/blob/50.6/src/wayland/meta-wayland-gtk-shell.c) advertises the app-menu capability based on fallback-app-menu preferences; this does not supply a per-window global-menubar hiding API for the extension.
 
-Application paths and unique bus names come from the Mutter window's GTK metadata. Application names and PIDs are not used to guess a target window.
+Window-source paths and unique bus names come from the Mutter window's GTK metadata. The windowless desktop source watches the Files application's published bus name without auto-starting it, pins its unique owner and imports the application action group at `/org/gnome/Nautilus`. It does not claim a client window. Application names and PIDs are not used to guess a target window.
 
 ## Real-application verification
 
@@ -54,6 +56,7 @@ The harness opens two real windows per application in a private GNOME session:
 - Application preferences and compatible exported commands are present.
 - Disabling GnoMenu disposes its sources and panel actors.
 - Minimizing windows retains Files on the desktop, where New Tab still reaches the remembered window.
+- Closing every Files window keeps all desktop categories visible and disables window-dependent commands.
 - An unsupported focused fixture retains its own name even while Files is running, without inheriting Files commands.
 
 The accessibility observer is test infrastructure. The runtime extension does not require enabling a screen reader or accessing the desktop accessibility tree.

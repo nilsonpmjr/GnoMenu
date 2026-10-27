@@ -15,7 +15,8 @@ if args.update_template:
                     '--keyword=_', '--package-name=GnoMenu', '--package-version=0.1',
                     '--copyright-holder=GnoMenu contributors', '--no-wrap',
                     '--output=po/gnomenu.pot', 'extension/extension.js',
-                    'extension/gmenuSource.js', 'extension/actionMenus.js'], cwd=root, check=True)
+                    'extension/gmenuSource.js', 'extension/actionMenus.js',
+                    'extension/filesDesktopSource.js'], cwd=root, check=True)
 catalogs = sorted((root / 'po').glob('*.po'))
 if not catalogs:
     raise RuntimeError('No gettext catalogs found')

@@ -13,6 +13,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import {GMenuSource} from './gmenuSource.js';
+import {FilesDesktopSource} from './filesDesktopSource.js';
 import {sourceForWindow} from './windowSource.js';
 
 function label(text) {
@@ -54,6 +55,12 @@ export default class GnoMenu extends Extension {
         this._partial = false;
         this._signature = null;
         this._status = _('No menu available');
+        const files = Shell.AppSystem.get_default().lookup_app('org.gnome.Nautilus.desktop');
+        this._desktopSource = files ? new FilesDesktopSource(Gio.DBus.session, {
+            openWindow: () => files.open_new_window(-1),
+            openHome: () => files.app_info.launch_uris([
+                Gio.File.new_for_path(GLib.get_home_dir()).get_uri()], global.create_app_launch_context(0, -1)),
+        }, () => this._presentSource(), this.gettext.bind(this)) : null;
         this._displaySignal = global.display.connect('notify::focus-window', () => this._syncFocus());
         this._createdSignal = global.display.connect('window-created', () => this._queueFocus());
         this._appSignal = Shell.AppSystem.get_default().connect('app-state-changed', () => this._queueFocus());
@@ -71,6 +78,8 @@ export default class GnoMenu extends Extension {
         for (const entry of new Set([this._focusEntry, this._filesEntry]))
             entry?.source.destroy();
         this._focusEntry = this._filesEntry = null;
+        this._desktopSource?.destroy();
+        this._desktopSource = null;
         this._lastFilesWindow = null;
         this._unmanagedWindows = null;
         this._source = null;
@@ -163,7 +172,7 @@ export default class GnoMenu extends Extension {
         const focused = this._focusedWindow;
         const entry = focused ? (usable(this._focusEntry) ? this._focusEntry : null) :
             usable(this._filesEntry) ? this._filesEntry : null;
-        const source = entry?.source ?? null;
+        const source = entry?.source ?? (focused ? null : this._desktopSource);
         const window = focused ?? entry?.window ?? null;
         if (this._source !== source || this._window !== window) {
             this._source?.setCaptured(false);
@@ -173,9 +182,9 @@ export default class GnoMenu extends Extension {
         }
         this._window = window;
         this._desktopMode = !focused;
-        this._tree = entry?.tree ?? [];
-        this._appTree = entry?.info.applicationMenu ?? [];
-        this._partial = Boolean(entry?.info.partial);
+        this._tree = entry?.tree ?? source?.snapshot ?? [];
+        this._appTree = entry?.info.applicationMenu ?? source?.applicationMenu ?? [];
+        this._partial = Boolean(entry?.info.partial ?? source?.partial);
         this._status = entry?.info.truncated ? _('Some menu items could not be displayed') : _('No menu available');
         this._queueRender();
     }
@@ -255,11 +264,7 @@ export default class GnoMenu extends Extension {
             columns.forEach((column, index) => {
                 const button = this._button(column.label || _('Menu'), index);
                 this._fill(button.menu, column.children);
-                if (index === 0 && this._desktopMode && !this._source && app) {
-                    button.menu.addAction(_('New Window'), () => app.open_new_window(-1));
-                    button.menu.addAction(_('Home'), () => app.app_info.launch_uris([
-                        Gio.File.new_for_path(GLib.get_home_dir()).get_uri()], global.create_app_launch_context(0, -1)));
-                } else if (!column.children.length)
+                if (!column.children.length)
                     button.menu.addMenuItem(new PopupMenu.PopupMenuItem(roots.length ?
                         _('Application actions unavailable') : this._status, {reactive: false}));
                 if (index === 0 && this._partial && (appItems.length || roots.length)) {

@@ -4,6 +4,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import {GMenuSource} from '../extension/gmenuSource.js';
 import {sourceForWindow} from '../extension/windowSource.js';
+import {FilesDesktopSource} from '../extension/filesDesktopSource.js';
 
 function assert(condition, message) {
     if (!condition)
@@ -198,6 +199,30 @@ async function run() {
     capture.destroy();
     await waitFor(() => group2.get_action_state('show-menubar').unpack(), 'destruction restores local menu');
     print('PASS: disposing a captured source restores its local menubar');
+    let openedWindows = 0;
+    let openedHomes = 0;
+    const desktop = new FilesDesktopSource(bus, {
+        openWindow: () => openedWindows++, openHome: () => openedHomes++,
+    }, () => {}, text => text, owner);
+    sources.push(desktop);
+    const desktopItem = action => flatten([...desktop.snapshot, ...desktop.applicationMenu])
+        .find(node => node.action === action);
+    await waitFor(() => desktopItem('app.preferences')?.enabled && desktop.snapshot.length === 5,
+        'windowless Files desktop source and live application commands');
+    assert(desktopItem('app.new-window').enabled && desktopItem('win.go-home').enabled,
+        'Desktop launchers must remain enabled without a client window');
+    assert(!desktopItem('win.new-tab').enabled && !desktop.activate(desktopItem('win.new-tab')),
+        'A desktop menu must not invent a target for window commands');
+    assert(!desktopItem('app.clone-window').enabled,
+        'An application-scoped duplicate-window action still requires a window');
+    desktop.activate(desktopItem('app.new-window'));
+    desktop.activate(desktopItem('win.go-home'));
+    assert(openedWindows === 1 && openedHomes === 1, 'Desktop commands must reach their launchers');
+    assert(desktop.activate(desktopItem('app.preferences')), 'Windowless preferences must reach its actual exporter');
+    await waitFor(() => appGroup.get_action_state('preferences-count').unpack() === 2,
+        'desktop preferences uses the real exported application action');
+    print('PASS: windowless Files keeps structured menus, working launchers and only actual application actions');
+    const oldDesktopPreferences = desktopItem('app.preferences');
     const app = Gio.DBusActionGroup.get(bus, owner, '/lab/app');
     app.list_actions();
     await waitFor(() => app.has_action('quit'), 'quit action');
@@ -205,6 +230,16 @@ async function run() {
     await waitFor(() => second.closed, 'service disappearance invalidates source');
     assert(second.snapshot.length === 0, 'Lost service must clear menu');
     print('PASS: owner disappearance clears the source');
+    await waitFor(() => !desktopItem('app.preferences').enabled && desktop.descriptor.busName === null,
+        'desktop releases the lost application owner');
+    assert(!desktop.closed && desktop.snapshot.length === 5 && desktopItem('app.new-window').enabled,
+        'Structured desktop menus must survive Files stopping');
+    assert(!desktop.activate(oldDesktopPreferences), 'Old owner commands must not reach a replacement exporter');
+    const staleDesktopLauncher = desktopItem('app.new-window');
+    desktop.destroy();
+    assert(desktop.closed && !desktop.activate(staleDesktopLauncher),
+        'A disposed desktop source must reject its old launchers');
+    print('PASS: Files desktop menus survive owner loss and release all actions on disposal');
 }
 
 run().catch(error => {

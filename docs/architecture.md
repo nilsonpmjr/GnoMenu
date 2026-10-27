@@ -10,9 +10,9 @@ Focused Mutter window
   → native GNOME panel buttons and popups
 ```
 
-The shipped runtime consists of `extension.js`, `windowSource.js`, `gmenuSource.js`, `actionMenus.js`, metadata and CSS. Compiled gettext catalogs and the GPL license text are packaged alongside them.
+The shipped runtime consists of `extension.js`, `windowSource.js`, `gmenuSource.js`, `actionMenus.js`, `filesDesktopSource.js`, metadata and CSS. Compiled gettext catalogs and the GPL license text are packaged alongside them.
 
-There is no Python helper, application launcher, network client, telemetry or clipboard integration in the installed ZIP.
+There is no Python helper, network client, telemetry or clipboard integration in the installed ZIP. Desktop launchers use the Shell and Gio application APIs.
 
 ## Discovery and transport
 
@@ -24,13 +24,15 @@ Native menu models retain their labels, order, sections, nesting and typed targe
 
 ## Lifetimes
 
-The extension maintains at most two sources: the focused window and the last active Files window. Sources that are no longer either target are disposed. Changing the displayed source or window advances an epoch; popup focus temporarily held by the Shell keeps the current target. Focus identity is tracked independently of source availability, so an empty focused source keeps its application's name while waiting for commands. Files is displayed only when there is no focused app.
+The extension maintains up to two window sources: the focused window and the last active Files window. Window sources that are no longer either target are disposed. A persistent `FilesDesktopSource` supplies the same explicit Files adapter when no Files window exists. It watches the published application name without requesting service activation and creates a pinned application-only GMenu source when that name has an owner. Its owner epoch invalidates stale commands across disconnects; launchers remain available without an owner. Window actions are never dispatched from this source.
+
+Changing the displayed source or window advances an epoch; popup focus temporarily held by the Shell keeps the current target. Focus identity is tracked independently of source availability, so an empty focused source keeps its application's name while waiting for commands. Files is displayed only when there is no focused app.
 
 The source watches its unique D-Bus owner, tracks model/action signals and coalesces updates into an idle source. Destruction disconnects those signals, removes pending work, unwatches the name and clears its state.
 
 Visible nodes carry source provenance. A state refresh may preserve an unchanged command, while changed action identities, foreign-source nodes and disposed sources are rejected.
 
-`disable()` disconnects display, application and window signals, destroys both sources and panel actors, cancels remaining idles and clears cached model/render state. Runtime objects are created after `enable()`.
+`disable()` disconnects display, application and window signals, destroys the window sources, persistent desktop source and panel actors, cancels remaining idles and clears cached model/render state. Runtime objects are created after `enable()`.
 
 Only the displayed source is captured. A captured complete native menubar can use an exported window visibility action to hide its local counterpart. Ownership records the original boolean value and restores it when capture ends; destruction restores it before releasing the action group. Partial and truncated models do not hide local menus.
 
