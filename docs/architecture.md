@@ -24,7 +24,7 @@ Native application menus retain their labels. Conventional application actions p
 
 ## Lifetimes
 
-The extension maintains at most two sources: the focused window and the last active Files window. Sources that are no longer either target are disposed. Changing the displayed source advances an epoch; popup focus temporarily held by the Shell keeps the current target. An empty focused source remains subscribed so newly exported commands can replace the Files fallback.
+The extension maintains at most two sources: the focused window and the last active Files window. Sources that are no longer either target are disposed. Changing the displayed source or window advances an epoch; popup focus temporarily held by the Shell keeps the current target. Focus identity is tracked independently of source availability, so an empty focused source keeps its application's name while waiting for commands. Files is displayed only when there is no focused app.
 
 The source watches its unique D-Bus owner, tracks model/action signals and coalesces updates into an idle source. Destruction disconnects those signals, removes pending work, unwatches the name and clears its state.
 

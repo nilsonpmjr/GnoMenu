@@ -37,6 +37,7 @@ export default class GnoMenu extends Extension {
         this._bindings = [];
         this._windowSignals = [];
         this._window = null;
+        this._focusedWindow = null;
         this._source = null;
         this._focusEntry = null;
         this._filesEntry = null;
@@ -81,6 +82,7 @@ export default class GnoMenu extends Extension {
         }
         this._renderId = this._focusId = 0;
         this._window = null;
+        this._focusedWindow = null;
         this._tree = [];
         this._appTree = [];
         this._signature = null;
@@ -93,6 +95,7 @@ export default class GnoMenu extends Extension {
         // A Shell popup can temporarily take keyboard focus away from its client.
         if (!window && (this._rendering || this._buttons.some(button => button.menu.isOpen)))
             return;
+        this._focusedWindow = window && !this._unmanagedWindows.has(window) ? window : null;
         const windows = global.get_window_actors().map(actor => actor.meta_window)
             .filter(candidate => !this._unmanagedWindows.has(candidate));
         const files = windows.filter(candidate => candidate.get_gtk_application_id() === 'org.gnome.Nautilus');
@@ -132,6 +135,8 @@ export default class GnoMenu extends Extension {
         for (const target of windows) {
             this._windowSignals.push([target, target.connect('unmanaged', () => {
                 this._unmanagedWindows.add(target);
+                if (this._focusedWindow === target)
+                    this._focusedWindow = null;
                 // Drop the displayed source immediately; the actor can remain
                 // in get_window_actors() until its closing animation finishes.
                 for (const entry of [this._focusEntry, this._filesEntry]) {
@@ -144,7 +149,7 @@ export default class GnoMenu extends Extension {
                 this._queueFocus();
             })]);
             for (const property of ['gtk-unique-bus-name', 'gtk-application-id', 'gtk-menubar-object-path',
-                'gtk-app-menu-object-path', 'gtk-application-object-path', 'gtk-window-object-path']) {
+                'gtk-app-menu-object-path', 'gtk-application-object-path', 'gtk-window-object-path', 'title']) {
                 this._windowSignals.push([target,
                     target.connect(`notify::${property}`, () => this._queueFocus())]);
             }
@@ -155,17 +160,19 @@ export default class GnoMenu extends Extension {
     _presentSource() {
         const usable = entry => entry && !entry.source.closed &&
             (entry.tree.length || entry.info.applicationMenu?.length);
-        const primary = usable(this._focusEntry);
-        const entry = primary ? this._focusEntry : usable(this._filesEntry) ? this._filesEntry : null;
+        const focused = this._focusedWindow;
+        const entry = focused ? (usable(this._focusEntry) ? this._focusEntry : null) :
+            usable(this._filesEntry) ? this._filesEntry : null;
         const source = entry?.source ?? null;
-        if (this._source !== source) {
+        const window = focused ?? entry?.window ?? null;
+        if (this._source !== source || this._window !== window) {
             this._source?.setCaptured(false);
             ++this._epoch;
             this._source = source;
             source?.setCaptured(true);
         }
-        this._window = entry?.window ?? null;
-        this._desktopMode = !primary;
+        this._window = window;
+        this._desktopMode = !focused;
         this._tree = entry?.tree ?? [];
         this._appTree = entry?.info.applicationMenu ?? [];
         this._partial = Boolean(entry?.info.partial);
@@ -220,7 +227,7 @@ export default class GnoMenu extends Extension {
     _render() {
         const app = this._window ? Shell.WindowTracker.get_default().get_window_app(this._window) :
             Shell.AppSystem.get_default().lookup_app('org.gnome.Nautilus.desktop');
-        const appName = app?.get_name() || (this._desktopMode ? _('Desktop') : this._window?.get_wm_class()) || _('Desktop');
+        const appName = app?.get_name() || this._window?.get_wm_class() || this._window?.title || _('Desktop');
         const signature = `${this._epoch}:${appName}:${this._partial}:${this._status}:${structure([this._appTree, this._tree])}`;
         if (signature === this._signature) {
             this._updateBindings();
@@ -248,7 +255,7 @@ export default class GnoMenu extends Extension {
             columns.forEach((column, index) => {
                 const button = this._button(column.label || _('Menu'), index);
                 this._fill(button.menu, column.children);
-                if (index === 0 && !this._source && app) {
+                if (index === 0 && this._desktopMode && !this._source && app) {
                     button.menu.addAction(_('New Window'), () => app.open_new_window(-1));
                     button.menu.addAction(_('Home'), () => app.app_info.launch_uris([
                         Gio.File.new_for_path(GLib.get_home_dir()).get_uri()], global.create_app_launch_context(0, -1)));

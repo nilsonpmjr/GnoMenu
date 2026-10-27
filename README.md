@@ -21,7 +21,7 @@ See [compatibility and limitations](docs/compatibility.md). A **Partial menu** l
 
 ## Desktop and local menus
 
-Outside an application with captured commands, GnoMenu shows Files. Its menus stay bound to the last active Nautilus window, including when the windows are minimized. If no Files window is available, the Files heading offers New Window and Home launchers. Without an installed Files application, the heading reads Desktop.
+Every focused application keeps its own name in the panel, including applications without captured commands. When no app has focus, GnoMenu shows Files. Its menus stay bound to the last active Nautilus window, including when the windows are minimized. If no Files window is available, the desktop's Files heading offers New Window and Home launchers. Without an installed Files application, the desktop heading reads Desktop.
 
 An imported native menubar is hidden locally when the application exports a boolean window action named `show-menubar`, `show-menu-bar` or `menubar-visible`. Its original state is restored when capture ends or GnoMenu is disabled. Partial adapters and applications without that control retain their local menus. GNOME/Wayland does not provide a general way to remove arbitrary GTK4 or Electron controls from another application.
 

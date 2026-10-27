@@ -22,7 +22,9 @@ Selection commands, copy/paste and other internal commands may remain available 
 
 ## Desktop fallback
 
-On the desktop or in an app without captured commands, the panel shows the last active Files window and retains its exact D-Bus window paths. Commands continue to reach that Files window. An installed Files application with no window supplies New Window and Home launchers instead. Without Files installed, the panel shows Desktop. The extension's own name is never the desktop title.
+Every focused app retains its own name, even when it exports no compatible commands. Such an app displays a localized unavailable status and never inherits Files commands or launchers.
+
+On the desktop, with no app focused, the panel shows the last active Files window and retains its exact D-Bus window paths. Commands continue to reach that Files window. An installed Files application with no window supplies New Window and Home launchers instead. Without Files installed, the desktop panel shows Desktop. The extension's own name is never the desktop title.
 
 ## Local-menu ownership
 
@@ -50,7 +52,7 @@ The harness opens two real windows per application in a private GNOME session:
 - Application preferences and compatible exported commands are present.
 - Disabling GnoMenu disposes its sources and panel actors.
 - Minimizing windows retains Files on the desktop, where New Tab still reaches the remembered window.
-- Focusing an unsupported fixture application keeps the real Files fallback.
+- An unsupported focused fixture retains its own name even while Files is running, without inheriting Files commands.
 
 The accessibility observer is test infrastructure. The runtime extension does not require enabling a screen reader or accessing the desktop accessibility tree.
 

@@ -11,7 +11,7 @@ The long-term goal is broad global-menu support across system applications and c
 - Standard exported preferences/about/quit actions as a fallback.
 - Partial action menus for Nautilus 50.4 and Ptyxis 50.1.
 - Generic additional commands from exported action groups, including typed boolean choices.
-- Files fallback on the desktop and in applications without captured commands.
+- Every focused app retains its name, including apps without captured commands; Files is the desktop fallback.
 - Reversible local-menubar ownership through exported window visibility actions.
 - Exact window-scoped commands, source disposal and stale-response handling.
 - Leading-edge dropdown placement, RTL behavior and monitor-edge containment.

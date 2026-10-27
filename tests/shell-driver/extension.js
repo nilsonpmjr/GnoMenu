@@ -193,10 +193,12 @@ export default class ShellTestDriver extends Extension {
         const unsupported = await waitFor(() => windowsFor('org.example.GnoMenuNoMenu')[0],
             'unsupported application in the real-app session');
         Main.activateWindow(unsupported, global.get_current_time());
-        await waitFor(() => global.display.focus_window === unsupported && extension._desktopMode &&
-            extension._source?.descriptor.windowPath === desktopTarget.get_gtk_window_object_path(),
-        'unsupported application falls back to the remembered Files window');
-        passed.push('An unsupported focused application retains the real Files commands and identity');
+        await waitFor(() => global.display.focus_window === unsupported && !extension._desktopMode &&
+            extension._window === unsupported && !extension._source && extension._bindings.length === 0 &&
+            extension._buttons[0]?.get_first_child().text === tracker.get_window_app(unsupported).get_name(),
+        'unsupported application keeps its own identity while Files is running');
+        assert(!binding('win.new-tab'), 'Unsupported application must not inherit Files commands');
+        passed.push('An unsupported focused application keeps its own title without inheriting Files commands');
         const beforeDesktop = await observe(desktopTarget);
         for (const window of [...nautilus, ...terminals, unsupported])
             window.minimize();
@@ -461,16 +463,14 @@ export default class ShellTestDriver extends Extension {
         'application without an exported menu');
         Main.activateWindow(unsupported, global.get_current_time());
         await waitFor(() => global.display.focus_window === unsupported &&
-            extension._desktopMode && !extension._source && extension._bindings.length === 0,
-        'unsupported app selects the desktop fallback');
-        const files = Shell.AppSystem.get_default().lookup_app('org.gnome.Nautilus.desktop');
+            !extension._desktopMode && extension._window === unsupported &&
+            !extension._source && extension._bindings.length === 0 &&
+            extension._buttons[0]?.get_first_child().text === 'GnoMenu sem menu',
+        'unsupported app retains its own title');
         assert(extension._buttons.length === 1 &&
-            extension._buttons[0].get_first_child().text === (files?.get_name() ?? extension.gettext('Desktop')),
-        'Unsupported app must display Files or Desktop, never the extension name');
-        if (files)
-            assert(extension._buttons[0].menu._getMenuItems()[0].label.text === extension.gettext('New Window'),
-                'Files fallback exposes its launcher when no Files window is running');
-        passed.push('Application without captured commands displays the Files/Desktop fallback');
+            extension._buttons[0].menu._getMenuItems()[0].label.text === extension.gettext('No menu available'),
+        'Unsupported app must show its own unavailable status without Files launchers');
+        passed.push('Application without captured commands retains its title and localized unavailable status');
         await select(windows[0]);
         const current = extension._source;
         await Main.extensionManager.disableExtension(UUID);
