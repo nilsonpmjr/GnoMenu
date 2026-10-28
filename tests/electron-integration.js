@@ -95,6 +95,10 @@ async function run() {
     assert(state().windows[0].counter === baseline[0] + 1, 'Second menu must not reach the first window');
     assert(!sources[0].activate(find(0, 'Disabled command')), 'Disabled command is rejected');
     print('PASS: GnoMenu dispatch reaches only the selected actual Electron window and rejects disabled commands');
+    // The bridge test replaced the native menu. Electron recreates its lazy
+    // submenus, so prepare View again instead of assuming its old contents live.
+    await reopen(0, 'View');
+    await until(() => find(0, 'Checked option'), 'recreated native View contents');
     await until(() => sources[0]?.activate(find(0, 'Checked option')), 'current native checkbox command can dispatch');
     await until(() => state().windows[0].checked, 'native checkbox callback');
     await reopen(0, 'View');
@@ -125,7 +129,7 @@ async function run() {
     assert(!find(1, 'Dynamic command'), 'Dynamic menu changes remain per-window');
     await until(() => sources[0]?.activate(find(0, 'Dynamic command')), 'new native command can dispatch');
     await until(() => state().windows[0].counter === baseline[0] + 2, 'dynamic native command dispatch');
-    print('PASS: Actual Electron layout replacement imports a dynamic command with exact window scope');
+    print('PASS: Native dynamic commands remain window-scoped and invocable after full bridge cleanup');
     const stale = find(0, 'Increment this window');
     const originalSource = sources[0];
     await until(() => sources[0]?.activate(find(0, 'Close this window')), 'current native close command can dispatch');

@@ -31,7 +31,7 @@ def ready(process, name):
     return json.loads(process.stdout.readline())
 
 
-for transport in ('gmenu', 'dbusmenu', 'registrar', 'discovery'):
+for transport in ('gmenu', 'dbusmenu', 'bridge', 'registrar', 'discovery'):
     registrar = None
     environment = dict(os.environ)
     if transport == 'discovery':
@@ -40,7 +40,7 @@ for transport in ('gmenu', 'dbusmenu', 'registrar', 'discovery'):
         ready(registrar, 'discovery registrar')
         environment['GNOMENU_FIXTURE_REGISTER'] = '1'
     service = ('broker/appmenu-registrar.py' if transport == 'registrar'
-               else 'fixtures/dbusmenu-service.py' if transport == 'discovery'
+               else 'fixtures/dbusmenu-service.py' if transport in ('discovery', 'bridge')
                else f'fixtures/{transport}-service.py')
     exporter = subprocess.Popen([sys.executable, str(root / service)],
                                 env=environment, stdout=subprocess.PIPE, text=True)

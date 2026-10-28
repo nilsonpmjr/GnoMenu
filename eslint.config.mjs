@@ -1,5 +1,5 @@
 export default [{
-    files: ['extension/**/*.js', 'tests/**/*.js'],
+    files: ['extension/**/*.js', 'tests/**/*.js', 'companion/**/*.js'],
     languageOptions: {
         ecmaVersion: 2022,
         sourceType: 'module',

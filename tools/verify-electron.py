@@ -51,13 +51,15 @@ def main():
     files = ['fixtures/electron-menu/main.cjs', 'fixtures/electron-menu/package.json',
              'tests/electron-observer/extension.js', 'tests/electron-observer/metadata.json',
              'tests/electron-integration.js', 'tests/electron-window-association.js',
+             'tests/bridge-helpers.js', 'companion/dbusmenuBridge.js',
              'extension/windowSource.js', 'extension/gmenuSource.js', 'extension/actionMenus.js',
              'tests/run-electron.py', 'tools/verify-electron.py',
              'extension/appmenuDiscovery.js', 'extension/dbusmenuSource.js', 'broker/appmenu-registrar.py']
     report = {'success': True, 'timestamp_utc': datetime.now(timezone.utc).isoformat(), 'cases': cases,
               'source_sha256': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in files},
               'support_status': 'Controlled fixture only; no Signal/Obsidian application or Flatpak integration is established',
-              'limits': ['A single-command X11 property association probe passes; automatic third-party association, full menu bridging and panel integration remain pending.',
+              'limits': ['The owned XWayland fixture passes full exported-model bridging through GTK metadata; automatic third-party identity validation and panel integration remain pending.',
+                         'Standard submenu actions are exercised by the test consumer; production panel submenu preparation is not integrated.',
                          'Checkbox callback state and server-advertised state are recorded independently; passing the replay does not certify checked-state synchronization.',
                          'Wayland absence is bounded to the recorded runtime, fixture and interval; it is not a claim about every Electron app.',
                          'The staged core ELF is byte-identical; vendor application ASARs and unpacked addons are excluded. Runtime execution occurs outside Flatpak.']}

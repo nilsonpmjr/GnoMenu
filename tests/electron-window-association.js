@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 GnoMenu contributors
-// Experimental association probe, not a general DBusMenu-to-GMenu bridge.
+// Full-model companion replay on owned fixture windows only.
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import {GMenuSource} from '../extension/gmenuSource.js';
+import {DBusMenuBridge} from '../companion/dbusmenuBridge.js';
+import {setImportedSubmenuOpen} from './bridge-helpers.js';
 
 const PROPERTIES = ['_GTK_UNIQUE_BUS_NAME', '_GTK_MENUBAR_OBJECT_PATH', '_GTK_WINDOW_OBJECT_PATH'];
 const flatten = nodes => nodes.flatMap(node => [node, ...flatten(node.children)]);
@@ -47,24 +49,14 @@ export async function verifyWindowAssociation(windows, nativeSources, observatio
                 assert(!xprop(window.xid, [property]).includes(' = '), 'Existing GTK metadata must be preserved');
             const menuPath = `/org/gnomenu/Association/window${index}/menu`;
             const windowPath = `/org/gnomenu/Association/window${index}`;
-            const group = new Gio.SimpleActionGroup();
-            const action = new Gio.SimpleAction({name: 'increment'});
-            action.connect('activate', () => {
-                const source = nativeSources[index];
-                const node = flatten(source?.snapshot ?? []).find(item => item.label === 'Increment this window');
-                if (node)
-                    source.activate(node);
-            });
-            group.add_action(action);
-            const submenu = new Gio.Menu();
-            submenu.append('Increment this window', 'win.increment');
-            const menu = new Gio.Menu();
-            menu.append_submenu('File', submenu);
+            const bridge = new DBusMenuBridge(bus, nativeSources[index].descriptor,
+                {menuPath, actionPath: windowPath}, info => {
+                    if (info.error)
+                        printerr(`Bridge: ${info.error}`);
+                });
             const record = {xid: window.xid, descriptor: {busName: owner, menuPath, windowPath},
-                exports: [], source: null};
+                bridge, source: null};
             records.push(record);
-            record.exports.push(['menu', bus.export_menu_model(menuPath, menu)]);
-            record.exports.push(['actions', bus.export_action_group(windowPath, group)]);
             for (const [property, value] of [[PROPERTIES[0], owner], [PROPERTIES[1], menuPath],
                 [PROPERTIES[2], windowPath]])
                 xprop(window.xid, ['-f', property, '8u', '-set', property, value]);
@@ -78,30 +70,57 @@ export async function verifyWindowAssociation(windows, nativeSources, observatio
         for (const [index, record] of records.entries()) {
             const descriptor = observed.find(window => window.menuSource?.menuPath === record.descriptor.menuPath).menuSource;
             record.source = new GMenuSource(bus, descriptor, () => {});
-            await until(() => flatten(record.source.snapshot).some(node => node.enabled && node.action === 'win.increment'),
+            await until(() => flatten(record.source.snapshot).some(node => node.enabled && node.label === 'Increment this window'),
                 'GnoMenu imports the model selected through Meta.Window metadata');
             const before = state().windows.map(window => window.counter);
-            const command = flatten(record.source.snapshot).find(node => node.action === 'win.increment');
+            const command = flatten(record.source.snapshot).find(node => node.label === 'Increment this window');
             assert(record.source.activate(command), 'Imported association command is available');
             await until(() => state().windows[index].counter === before[index] + 1, 'associated native command dispatch');
             assert(state().windows[1 - index].counter === before[1 - index], 'Association must preserve the other window');
         }
         print('PASS: Standard X11 GTK properties associate distinct imported menus with the exact Meta windows');
         print('PASS: Commands imported through Meta.Window metadata reach only their original Electron window');
+        const find = (index, label) => flatten(records[index].source.snapshot).find(node => node.label === label);
+        const outline = nodes => nodes.flatMap(node => node.kind === 'separator' ? [] :
+            node.kind === 'section' ? outline(node.children) :
+                [{label: node.label, kind: node.kind, children: outline(node.children)}]);
+        for (const index of [0, 1]) {
+            await until(() => find(index, 'Disabled command') && find(index, 'Checked option'), 'full native model import');
+            await until(() => JSON.stringify(outline(records[index].source.snapshot)) ===
+                JSON.stringify(outline(nativeSources[index].snapshot)), 'all exported native menu entries cross the bridge');
+            assert(!records[index].source.activate(find(index, 'Disabled command')), 'Bridge rejects native disabled commands');
+            assert(find(index, 'Checked option').toggle?.type === 'check', 'Native checkbox remains a stateful action');
+            assert(records[index].source.snapshot.filter(node => node.kind === 'submenu').map(node => node.label).join(',') === 'File,View',
+                'Native heading order and labels are preserved');
+        }
+        print('PASS: The complete Electron fixture model retains native headings, disabled commands and advertised checkbox roles');
+        const previous = find(0, 'Increment this window');
+        const beforeDynamic = state().windows[0].counter;
+        assert(records[0].source.activate(find(0, 'Add dynamic command')), 'Bridge can invoke native model replacement');
+        await until(() => state().windows[0].dynamic, 'native layout replacement from bridged command');
+        await until(() => {
+            if (find(0, 'Dynamic command'))
+                return true;
+            // Replaced native menus acquire a new GMenu action generation.
+            // Reopen the current heading instead of keeping an obsolete action.
+            setImportedSubmenuOpen(records[0].source, 'File', true);
+            return false;
+        }, 'bridge republishes dynamic native layout');
+        assert(!find(1, 'Dynamic command'), 'Bridged model replacement remains window-scoped');
+        assert(!records[0].source.activate(previous), 'Old GMenu command cannot address replacement native items');
+        await until(() => records[0].source.activate(find(0, 'Dynamic command')), 'current dynamic bridged action');
+        await until(() => state().windows[0].counter === beforeDynamic + 1, 'dynamic command forwarded through both protocols');
+        await until(() => setImportedSubmenuOpen(records[0].source, 'File', false), 'standard exported submenu close');
+        print('PASS: Native layout replacement crosses the full bridge, prepares lazily, rejects stale commands and preserves window scope');
         return {success: true, descriptors: records.map(record => record.descriptor),
-            scope: 'Owned XWayland fixture; single-command association probe, not a full menu bridge'};
+            scope: 'Owned XWayland fixture; full exported model bridge, no production discovery or panel rendering'};
     } finally {
         for (const record of records) {
-            const stale = flatten(record.source?.snapshot ?? []).find(node => node.action === 'win.increment');
+            const stale = flatten(record.source?.snapshot ?? []).find(node => node.label === 'Increment this window');
             record.source?.destroy();
             if (record.source)
                 assert(!record.source.activate(stale), 'Disposed association commands cannot dispatch');
-            for (const [kind, id] of record.exports) {
-                if (kind === 'menu')
-                    bus.unexport_menu_model(id);
-                else
-                    bus.unexport_action_group(id);
-            }
+            record.bridge.destroy();
             // Remove only values still owned by this probe, preserving any
             // replacement metadata rather than overwriting another writer.
             for (const [property, value] of [[PROPERTIES[0], owner],
