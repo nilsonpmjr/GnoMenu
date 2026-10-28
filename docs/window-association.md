@@ -28,6 +28,8 @@ This establishes a potential companion-to-Mutter association seam for X11, inclu
 
 ## Remaining experiments
 
+The [X11 ownership guard](x11-identity.md) now independently checks registrar-declared XIDs against live managed windows, server-reported XRes PIDs and unique D-Bus credentials before the private bridge publishes metadata. Foreign owners, forged PID hints and already closed windows are rejected. This is a non-atomic process-ownership observation on the fixture, not complete third-party identity or menu authentication.
+
 The [controlled Electron replay](electron-replay.md) uses two actual XWayland windows with identical titles and the same PID. Their native handles match distinct registrar entries, and the existing discovery/transport pipeline routes real commands independently. Meta internal IDs differ from those XIDs, and the objects do not expose `get_xwindow`. Description strings remain observations only. Next steps are independently validated third-party X11 identity/lifecycle handling, installable companion packaging and isolated vendor/Flatpak checks before production integration.
 
 The [installed Electron/Flatpak investigation](electron-compatibility.md) confirms static Electron menu construction and records sandbox declarations. The read-only probe can find instance-specific owned names, but those names still do not establish a Mutter window association. No new DBusMenu panel integration is claimed by that diagnostic.

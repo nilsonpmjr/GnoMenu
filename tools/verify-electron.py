@@ -44,6 +44,10 @@ def main():
             result['panel_screenshot_sha256'] = hashlib.sha256((directory / backend / 'electron-panel.png').read_bytes()).hexdigest()
             result['passed'] = [line[6:] for line in (directory / backend / 'integration.log').read_text().splitlines()
                                 if line.startswith('PASS: ')]
+            result['identity'] = json.loads((directory / backend / 'identity.json').read_text())
+            result['identity_withdrawal'] = json.loads((directory / backend / 'identity-withdrawal.json').read_text())
+            assert result['identity']['success'] and result['identity_withdrawal']['success']
+            result['passed'] += result['identity']['passed'] + result['identity_withdrawal']['passed']
         else:
             assert result['wayland_observation_ms'] >= 3000
             assert all('xid' not in window for window in result['fixture']['windows'])
@@ -58,6 +62,7 @@ def main():
              'tests/electron-observer/extension.js', 'tests/electron-observer/metadata.json',
              'tests/electron-integration.js', 'tests/electron-window-association.js',
              'tests/bridge-helpers.js', 'tests/electron-panel.js', 'companion/dbusmenuBridge.js',
+             'tests/x11-identity.py', 'companion/x11_identity.py',
              'extension/extension.js', 'extension/metadata.json', 'extension/filesDesktopSource.js', 'extension/stylesheet.css',
              'extension/windowSource.js', 'extension/gmenuSource.js', 'extension/actionMenus.js',
              'tests/run-electron.py', 'tools/verify-electron.py',
@@ -65,7 +70,8 @@ def main():
     report = {'success': True, 'timestamp_utc': datetime.now(timezone.utc).isoformat(), 'cases': cases,
               'source_sha256': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in files},
               'support_status': 'Controlled fixture only; no Signal/Obsidian application or Flatpak integration is established',
-              'limits': ['The owned XWayland fixture passes full exported-model bridging and production panel rendering; automatic third-party identity validation and installable companion integration remain pending.',
+              'limits': ['Server-managed XIDs and XRes/D-Bus process agreement are checked before the owned fixture bridge; this non-atomic snapshot does not authenticate menu contents or establish arbitrary third-party/Flatpak support.',
+                         'Installable companion integration and live identity revalidation remain pending.',
                          'Private panel input uses actor APIs, not physical or virtual pointer/keyboard events. Full accessibility and input coverage remain pending.',
                          'Checkbox callback state and server-advertised state are recorded independently; passing the replay does not certify checked-state synchronization.',
                          'Wayland absence is bounded to the recorded runtime, fixture and interval; it is not a claim about every Electron app.',

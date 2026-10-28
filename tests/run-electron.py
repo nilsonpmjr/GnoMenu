@@ -54,7 +54,8 @@ def main():
     report_dir.mkdir(parents=True, exist_ok=True)
     for name in ['result.json', 'fixture-final.json', 'integration.json', 'integration.json.layouts.json',
                  'integration.json.failure.json', 'integration.json.raw-layout.txt', 'integration.log',
-                 'integration.json.panel-failure.json', 'electron-panel.png', 'panel-trace.json']:
+                 'integration.json.panel-failure.json', 'electron-panel.png', 'panel-trace.json',
+                 'identity.json', 'identity-withdrawal.json', 'identity.log', 'identity-withdrawal.log']:
         (report_dir / name).unlink(missing_ok=True)
     with tempfile.TemporaryDirectory(prefix='gnomenu-electron-') as directory:
         workspace = Path(directory)
@@ -149,6 +150,13 @@ def main():
                         value = menus()
                         return value if {item[0] for item in value} == expected else None
                     records = wait(exact_menus, 'two exact native registrations', [shell, app])
+                    identity_path = report_dir / 'identity.json'
+                    with (report_dir / 'identity.log').open('w') as identity_log:
+                        subprocess.run([sys.executable, str(ROOT / 'tests/x11-identity.py'), registration['owner'],
+                            str(identity_path)], env=app_env, check=True, timeout=10,
+                            stdout=identity_log, stderr=subprocess.STDOUT)
+                    identity = read_json(identity_path)
+                    assert {entry['windowId'] for entry in identity['identities']} == expected
                     for window in state['windows']:
                         properties = subprocess.check_output(['xprop', '-id', hex(window['xid']), '_NET_WM_PID'],
                                                              env=app_env, text=True, timeout=5)
@@ -158,13 +166,22 @@ def main():
                     integration_path = report_dir / 'integration.json'
                     integration_path.unlink(missing_ok=True)
                     check = subprocess.run(['gjs', '-m', str(ROOT / 'tests/electron-integration.js'),
-                        str(workspace / 'electron-state.json'), str(integration_path), str(observation), str(command)],
+                        str(workspace / 'electron-state.json'), str(integration_path), str(observation), str(command),
+                        str(identity_path)],
                         env=app_env, capture_output=True, text=True, timeout=35)
                     (report_dir / 'integration.log').write_text(check.stdout + check.stderr)
                     print(check.stdout, end='', flush=True)
                     if check.returncode:
                         raise RuntimeError(check.stderr)
                     integration = read_json(integration_path)
+                    final_windows = read_json(workspace / 'electron-state.json')['windows']
+                    closed = next(window['xid'] for window in final_windows if window['closed'])
+                    remaining = next(window['xid'] for window in final_windows if not window['closed'])
+                    with (report_dir / 'identity-withdrawal.log').open('w') as identity_log:
+                        subprocess.run([sys.executable, str(ROOT / 'tests/x11-identity.py'), registration['owner'],
+                            str(report_dir / 'identity-withdrawal.json'), '--closed-xid', str(closed),
+                            '--remaining-xid', str(remaining), '--exporter-owner', records[0][1]], env=app_env,
+                            check=True, timeout=10, stdout=identity_log, stderr=subprocess.STDOUT)
                 else:
                     started = time.monotonic()
                     seen = set(tuple(item) for item in records)

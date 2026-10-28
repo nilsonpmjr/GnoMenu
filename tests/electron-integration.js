@@ -75,7 +75,7 @@ async function run() {
         'One actual process exports two independent menu paths');
     print('PASS: Actual Electron native handles resolve to distinct menubars despite identical titles and a shared process');
     print('PASS: Actual lazy Electron submenus populate through AboutToShow before their commands are imported');
-    observations.association = await verifyWindowAssociation(original.windows, sources, ARGV[2], ARGV[3], state);
+    observations.association = await verifyWindowAssociation(original.windows, sources, ARGV[2], ARGV[3], ARGV[4], state);
     const baseline = state().windows.map(window => window.counter);
     const find = (index, label) => flatten(sources[index]?.snapshot ?? []).find(node => node.label === label);
     const reopen = async (index, label) => {

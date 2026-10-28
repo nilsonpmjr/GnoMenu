@@ -116,6 +116,7 @@ Artifacts are written to `build/`. Builds are deterministic for identical source
 - [Window association research](docs/window-association.md)
 - [Experimental menu bridge](docs/menu-bridge.md)
 - [Electron menus in the private Shell panel](docs/electron-panel.md)
+- [Experimental X11 ownership guard](docs/x11-identity.md)
 - [Contribution guide](CONTRIBUTING.md)
 - [Roadmap](PRODUCT.md)
 - [Publishing and GNOME review](docs/publishing.md)

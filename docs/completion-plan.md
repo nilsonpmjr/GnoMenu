@@ -22,6 +22,8 @@ Catalog publication makes this a community extension available through GNOME Ext
 
 The [Electron/Flatpak findings](electron-compatibility.md) identify the next concrete interoperability experiments. The [publishing guide](publishing.md) tracks the submission steps. None of the unverified priority applications should be advertised as supported yet.
 
+The [X11 ownership guard](x11-identity.md) now checks server/process agreement and rejection cases on the controlled fixture. Production publication still needs live revalidation and recovery, followed by actual vendor and Flatpak qualification. This guard does not complete the compatibility gate above.
+
 ## Definition of completion
 
 For each priority application, demonstrate that menus reach the correct window, actions retain their native targets and availability, focus/desktop transitions work, and local-menu ownership restores cleanly. Document the supported package/version/backend and limitations. A normal installation must reproduce that behavior outside the development harness.

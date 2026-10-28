@@ -18,7 +18,7 @@ Electron `43.8.3`, GNOME Shell `50.6`, Wayland compositor with a private XWaylan
 | Window close | The first declaration is withdrawn, its source is disposed and its old command is rejected; the remaining window's menu still works | Discovery withdrawal is checked independently after the panel bridge experiment has been cleaned up. Arbitrary third-party companion lifetime handling remains pending. |
 | Native Wayland | Two actual Wayland windows, no registrar declarations during the recorded interval of at least three seconds | The returned native handles are opaque values and are never coerced into XIDs. This is bounded to this runtime, fixture and interval. |
 
-Fifteen XWayland check groups and two Wayland observation groups pass. Shell logs are also checked for JavaScript, GJS, Clutter and St critical errors. Passing the replay means those declared checks completed; it does not certify full menu-state fidelity, support for vendor applications or universal Wayland behavior.
+Fifteen transport/panel groups, seven [X11 identity groups](x11-identity.md) and two Wayland observation groups pass. Shell logs are also checked for JavaScript, GJS, Clutter and St critical errors. Passing the replay means those declared checks completed; it does not certify full menu-state fidelity, support for vendor applications or universal Wayland behavior.
 
 ## Why vendor integration is still pending
 
@@ -54,8 +54,12 @@ Local artifacts, excluded from Git:
 - `reports/electron-bridge-rea.json`: controlled replay including the full exported-model bridge.
 - `reports/electron-export/x11/electron-panel.png`: the private panel with the imported dynamic command.
 - `reports/electron-panel-stable-rea.json`: controlled replay of the production renderer with nested and dynamic native menus.
+- `reports/electron-export/x11/identity.json` and `identity-withdrawal.json`: independent X11/D-Bus ownership checks before publication and after native window closure.
+- `reports/x11-identity-rea-final.json`: complete runtime Evidence for the 24-group identity/transport/panel/backend replay.
 
 ## REA evidence and limits
+
+X11 identity replay Evidence: `ev_b352596415279441aa76630a5955bdbe113da27d1531d6223e712fc3a8b175f9`, exit code 0, 24 groups. See [the ownership guard](x11-identity.md) for its exact process-agreement contract and non-atomic lifecycle limits.
 
 Private panel replay Evidence: `ev_350a7fcade60a3a6453517c9a49c6c12a25094f43cdaa1495a56b27e5c71cce5`, exit code 0, seventeen check groups and clean critical-error counts in both Shell logs. See [the panel guide](electron-panel.md) for the precise UI/input scope and remaining limits.
 

@@ -34,23 +34,29 @@ function xprop(xid, args) {
     return output;
 }
 
-export async function verifyWindowAssociation(windows, nativeSources, observationPath, commandPath, state) {
+export async function verifyWindowAssociation(windows, nativeSources, observationPath, commandPath, identityPath, state) {
     const bus = Gio.DBus.session;
     const owner = bus.get_unique_name();
     const records = [];
+    const [, identityBytes] = GLib.file_get_contents(identityPath);
+    const identities = JSON.parse(imports.byteArray.toString(identityBytes));
+    assert(identities.success, 'The independent identity checks must pass before metadata publication');
     const observations = () => {
         const [, bytes] = GLib.file_get_contents(observationPath);
         return JSON.parse(imports.byteArray.toString(bytes)).windows;
     };
     try {
         for (const [index, window] of windows.entries()) {
+            const verified = identities.identities.find(item => item.verified && item.windowId === window.xid &&
+                item.busName === nativeSources[index].descriptor.busName && item.menuPath === nativeSources[index].descriptor.menuPath);
+            assert(verified, 'An exact server/process-verified registrar descriptor is required');
             // Never replace existing application metadata. Only these owned
             // fixture XIDs, supplied by their native handles, are modified.
             for (const property of PROPERTIES)
                 assert(!xprop(window.xid, [property]).includes(' = '), 'Existing GTK metadata must be preserved');
             const menuPath = `/org/gnomenu/Association/window${index}/menu`;
             const windowPath = `/org/gnomenu/Association/window${index}`;
-            const bridge = new DBusMenuBridge(bus, nativeSources[index].descriptor,
+            const bridge = new DBusMenuBridge(bus, verified,
                 {menuPath, actionPath: windowPath}, info => {
                     if (info.error)
                         printerr(`Bridge: ${info.error}`);
