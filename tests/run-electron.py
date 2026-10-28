@@ -53,7 +53,8 @@ def main():
     report_dir = ROOT / 'reports/electron-export' / args.backend
     report_dir.mkdir(parents=True, exist_ok=True)
     for name in ['result.json', 'fixture-final.json', 'integration.json', 'integration.json.layouts.json',
-                 'integration.json.failure.json', 'integration.json.raw-layout.txt', 'integration.log']:
+                 'integration.json.failure.json', 'integration.json.raw-layout.txt', 'integration.log',
+                 'integration.json.panel-failure.json', 'electron-panel.png', 'panel-trace.json']:
         (report_dir / name).unlink(missing_ok=True)
     with tempfile.TemporaryDirectory(prefix='gnomenu-electron-') as directory:
         workspace = Path(directory)
@@ -75,16 +76,31 @@ def main():
         shutil.copytree(ROOT / 'tests/electron-observer', extensions / 'gnomenu-electron-observer@nilsonpmjr.local')
         shutil.copy2(ROOT / 'extension/windowSource.js',
                      extensions / 'gnomenu-electron-observer@nilsonpmjr.local/windowSource.js')
+        metadata = json.loads((ROOT / 'extension/metadata.json').read_text())
+        shutil.copytree(ROOT / 'extension', extensions / metadata['uuid'])
         observation = workspace / 'shell-state.json'
-        env = dict(os.environ, XDG_RUNTIME_DIR=str(private_runtime), XDG_DATA_HOME=str(workspace / 'data'),
+        command = workspace / 'shell-command.json'
+        (workspace / 'home').mkdir()
+        env = dict(os.environ, HOME=str(workspace / 'home'), XDG_RUNTIME_DIR=str(private_runtime), XDG_DATA_HOME=str(workspace / 'data'),
                    XDG_CONFIG_HOME=str(workspace / 'config'), XDG_CACHE_HOME=str(workspace / 'cache'),
                    XDG_STATE_HOME=str(workspace / 'state'), GSETTINGS_BACKEND='keyfile', GIO_USE_VFS='local',
                    GNOMENU_ELECTRON_OBSERVATION=str(observation), GNOMENU_ELECTRON_WORKSPACE=str(workspace),
+                   GNOMENU_ELECTRON_COMMAND=str(command), GNOMENU_UUID=metadata['uuid'],
+                   GNOMENU_ELECTRON_REPORT_DIR=str(report_dir),
                    GNOMENU_ELECTRON_BACKEND=args.backend, LIBGL_ALWAYS_SOFTWARE='1', NO_AT_BRIDGE='1')
         for name in ['DISPLAY', 'XAUTHORITY', 'WAYLAND_DISPLAY', 'LD_PRELOAD', 'NODE_OPTIONS', 'ELECTRON_RUN_AS_NODE']:
             env.pop(name, None)
+        # Service activation must inherit the private paths too, rather than
+        # the outer environment from before dbus-run-session was launched.
+        from gi.repository import Gio, GLib
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        private_keys = ['HOME', 'XDG_RUNTIME_DIR', 'XDG_DATA_HOME', 'XDG_CONFIG_HOME',
+                        'XDG_CACHE_HOME', 'XDG_STATE_HOME', 'GSETTINGS_BACKEND', 'GIO_USE_VFS']
+        bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+                      'UpdateActivationEnvironment', GLib.Variant('(a{ss})', ({key: env[key] for key in private_keys},)),
+                      GLib.VariantType.new('()'), Gio.DBusCallFlags.NO_AUTO_START, 1500, None)
         for schema, key, value in [
-            ('org.gnome.shell', 'enabled-extensions', "['gnomenu-electron-observer@nilsonpmjr.local']"),
+            ('org.gnome.shell', 'enabled-extensions', json.dumps([metadata['uuid'], 'gnomenu-electron-observer@nilsonpmjr.local'])),
             ('org.gnome.shell', 'disable-user-extensions', 'false'),
             ('org.gnome.shell', 'welcome-dialog-last-shown-version', "'50.0'")]:
             subprocess.run(['gsettings', 'set', schema, key, value], env=env, check=True)
@@ -119,8 +135,6 @@ def main():
                 assert state['fixturePath'] == 'runtime/resources/app' and state['profilePath'] == 'profile'
                 assert all(window['pid'] == state['pid'] and window['title'] == 'GnoMenu Electron Fixture'
                            for window in meta['windows'])
-                from gi.repository import Gio, GLib
-                bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
                 def menus():
                     return bus.call_sync(registration['owner'], '/com/canonical/AppMenu/Registrar',
                         'com.canonical.AppMenu.Registrar', 'GetMenus', None, GLib.VariantType.new('(a(uso))'),
@@ -144,7 +158,7 @@ def main():
                     integration_path = report_dir / 'integration.json'
                     integration_path.unlink(missing_ok=True)
                     check = subprocess.run(['gjs', '-m', str(ROOT / 'tests/electron-integration.js'),
-                        str(workspace / 'electron-state.json'), str(integration_path), str(observation)],
+                        str(workspace / 'electron-state.json'), str(integration_path), str(observation), str(command)],
                         env=app_env, capture_output=True, text=True, timeout=35)
                     (report_dir / 'integration.log').write_text(check.stdout + check.stderr)
                     print(check.stdout, end='', flush=True)
@@ -173,6 +187,17 @@ def main():
                 print(json.dumps(result, indent=2), flush=True)
                 return 0
             finally:
+                # Main's shutdown handlers can run a nested GLib loop after
+                # destroying panel actors. Stop our observer before termination.
+                if shell.poll() is None and observation.exists():
+                    try:
+                        pending = command.with_suffix('.tmp')
+                        pending.write_text(json.dumps({'id': 'harness-stop', 'operation': 'stop-observer'}))
+                        pending.replace(command)
+                        wait(lambda: ((read_json(observation) or {}).get('reply') or {}).get('id') == 'harness-stop',
+                             'private observer shutdown', [shell], seconds=3)
+                    except (OSError, RuntimeError, TimeoutError):
+                        print('Private observer did not acknowledge shutdown', file=sys.stderr)
                 final_state = workspace / 'electron-state.json'
                 if final_state.exists():
                     shutil.copy2(final_state, report_dir / 'fixture-final.json')
@@ -184,6 +209,13 @@ def main():
                         except subprocess.TimeoutExpired:
                             process.kill()
                             process.wait(timeout=5)
+                # The private document portal can mount FUSE under this owned
+                # runtime directory. Detach that mount before TemporaryDirectory
+                # removes it; never touch the regular session's portal mount.
+                document_mount = private_runtime / 'doc'
+                if document_mount.is_mount():
+                    subprocess.run(['fusermount3', '-u', str(document_mount)], env=env,
+                                   check=True, timeout=5, stdout=app_log, stderr=app_log)
 
 
 if __name__ == '__main__':

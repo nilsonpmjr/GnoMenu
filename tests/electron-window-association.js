@@ -6,6 +6,7 @@ import GLib from 'gi://GLib';
 import {GMenuSource} from '../extension/gmenuSource.js';
 import {DBusMenuBridge} from '../companion/dbusmenuBridge.js';
 import {setImportedSubmenuOpen} from './bridge-helpers.js';
+import {verifyElectronPanel} from './electron-panel.js';
 
 const PROPERTIES = ['_GTK_UNIQUE_BUS_NAME', '_GTK_MENUBAR_OBJECT_PATH', '_GTK_WINDOW_OBJECT_PATH'];
 const flatten = nodes => nodes.flatMap(node => [node, ...flatten(node.children)]);
@@ -33,7 +34,7 @@ function xprop(xid, args) {
     return output;
 }
 
-export async function verifyWindowAssociation(windows, nativeSources, observationPath, state) {
+export async function verifyWindowAssociation(windows, nativeSources, observationPath, commandPath, state) {
     const bus = Gio.DBus.session;
     const owner = bus.get_unique_name();
     const records = [];
@@ -57,8 +58,9 @@ export async function verifyWindowAssociation(windows, nativeSources, observatio
             const record = {xid: window.xid, descriptor: {busName: owner, menuPath, windowPath},
                 bridge, source: null};
             records.push(record);
-            for (const [property, value] of [[PROPERTIES[0], owner], [PROPERTIES[1], menuPath],
-                [PROPERTIES[2], windowPath]])
+            // Publish the unique owner last, after both model/action paths exist.
+            for (const [property, value] of [[PROPERTIES[1], menuPath], [PROPERTIES[2], windowPath],
+                [PROPERTIES[0], owner]])
                 xprop(window.xid, ['-f', property, '8u', '-set', property, value]);
         }
         await until(() => records.every(record => observations().some(window =>
@@ -112,8 +114,9 @@ export async function verifyWindowAssociation(windows, nativeSources, observatio
         await until(() => state().windows[0].counter === beforeDynamic + 1, 'dynamic command forwarded through both protocols');
         await until(() => setImportedSubmenuOpen(records[0].source, 'File', false), 'standard exported submenu close');
         print('PASS: Native layout replacement crosses the full bridge, prepares lazily, rejects stale commands and preserves window scope');
+        const panel = await verifyElectronPanel(records, observationPath, commandPath, state);
         return {success: true, descriptors: records.map(record => record.descriptor),
-            scope: 'Owned XWayland fixture; full exported model bridge, no production discovery or panel rendering'};
+            panel, scope: 'Owned XWayland fixture; full exported model bridge and private panel rendering, no production discovery'};
     } finally {
         for (const record of records) {
             const stale = flatten(record.source?.snapshot ?? []).find(node => node.label === 'Increment this window');

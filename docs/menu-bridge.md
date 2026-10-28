@@ -10,19 +10,19 @@ Every native snapshot receives new action names. An action queued for an earlier
 
 Submenus export the standard GMenu `submenu-action` attribute and a boolean action. Requesting `true` calls the native adapter's `AboutToShow`/opened sequence; requesting `false` sends closed. Native layout replacement publishes a new action generation. A consumer must use the current submenu action when reopening after replacement, rather than retaining an obsolete action name. Duplicate in-flight preparations on the same action are suppressed.
 
-The tests exercise these actions using a GMenu/D-Bus consumer. The production panel does **not yet prepare these actions**. A successful model replay is not a panel UI test. Retaining open menus through asynchronous replacement and forwarding nested opening/closing in the Shell renderer are the next integration steps.
+The tests exercise these actions through `GMenuSource` and the [production panel on a private desktop](electron-panel.md). Top-level and nested opening/closing now prepare native contents. The panel retains open hierarchy across asynchronous replacement within a bounded restoration interval and respects focus changes and explicit closure. This does not provide production third-party identity discovery or an installable companion.
 
 ## Evidence
 
-Nine independent protocol check groups run in the normal integration suite, including CI. They cover model structure and availability, exact command routing, live toggle notifications, lazy menu events, disabled ancestors, unsupported indeterminate toggles, stale commands, size limits, disposal and native owner loss.
+Ten independent protocol check groups run in the normal integration suite, including CI. They cover model structure and availability, exact command routing, live toggle notifications, production submenu preparation, lazy menu events, disabled ancestors, unsupported indeterminate toggles, stale commands, size limits, disposal and native owner loss.
 
-The [controlled Electron replay](electron-replay.md) now bridges every exported entry of its two actual XWayland fixture windows, comparing the imported hierarchy with the original DBusMenu snapshots. The unchanged production `sourceForWindow` and `GMenuSource` import through actual Meta window metadata. Native command invocation and dynamic replacement cross both protocols independently per window. Only the harness writes temporary GTK properties, using native handles supplied by its own fixture.
+The [controlled Electron replay](electron-replay.md) bridges every exported entry of its two actual XWayland fixture windows, comparing the imported hierarchy with the original DBusMenu snapshots. Production `sourceForWindow`, `GMenuSource` and the renderer import through actual Meta window metadata. Native command invocation, nested preparation and dynamic replacement cross both protocols independently per window. Only the harness writes temporary GTK properties, using native handles supplied by its own fixture.
 
 The replay uses Electron 43.8.3 outside Flatpak with our application code. Signal and Obsidian application code and user profiles are not run. There is no production X11 client discovery or registrar startup. Native Wayland remains a separate unsupported association/export path in this experiment.
 
 ## Limits before production
 
-- Integrate submenu preparation, focus transitions, replacement and disposal with the actual panel renderer, including nested menus.
+- Extend the private panel checks to broader native menu shapes, lifecycle stress and physical input; the existing proof covers the declared fixture only.
 - Validate third-party X11 identities and window lifetimes independently of fixture-provided handles; preserve pre-existing application metadata and competing registrars.
 - Define explicit companion installation, launch, recovery and removal. Keep local menus available until ownership can be established and restored.
 - Preserve additional presentation data such as native shortcut labels and icons; the current DBusMenu adapter does not import those properties.

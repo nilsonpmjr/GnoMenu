@@ -23,6 +23,7 @@ export class GMenuSource {
         this._applicationMenu = [];
         this._items = new Map();
         this._issuedNodes = new WeakSet();
+        this._openSubmenus = new Map();
         this._captured = false;
         this._hiddenMenubar = null;
         this.truncated = false;
@@ -112,6 +113,7 @@ export class GMenuSource {
                     id: `${path}/${i}`,
                     label: text('label'),
                     action: text('action'),
+                    submenuAction: text('submenu-action'),
                     layout: text('x-gnomenu-layout'),
                     target: attr('target'),
                     kind: submenu ? 'submenu' : section ? 'section' : 'item',
@@ -122,7 +124,10 @@ export class GMenuSource {
                 if ((hidden === 'action-missing' && !resolved.exists) ||
                     (hidden === 'action-disabled' && !resolved.enabled))
                     continue;
-                item.enabled = item.action ? resolved.enabled : Boolean(submenu || section);
+                const submenuResolved = item.submenuAction ? this._resolve({action: item.submenuAction, target: null}) : null;
+                item.enabled = item.action ? resolved.enabled : submenuResolved ?
+                    submenuResolved.enabled && submenuResolved.group.get_action_state(submenuResolved.name)?.get_type_string() === 'b' :
+                    Boolean(submenu || section);
                 item.toggle = resolved.toggle;
                 if (submenu || section)
                     item.children = read(submenu || section, item.id, depth + 1, branch);
@@ -260,6 +265,41 @@ export class GMenuSource {
             this._restoreLocalMenubar();
     }
 
+    prepare(item) {
+        return this._setSubmenuOpen(item, true);
+    }
+
+    close(item) {
+        return this._setSubmenuOpen(item, false);
+    }
+
+    _setSubmenuOpen(item, open) {
+        if (this._closed || !item || !this._issuedNodes.has(item) || item.kind !== 'submenu' || !item.submenuAction)
+            return false;
+        if (this._idle) {
+            GLib.source_remove(this._idle);
+            this._idle = 0;
+            this._refresh();
+        }
+        const current = this._items.get(item.id);
+        if (current?.kind !== 'submenu' || current.submenuAction !== item.submenuAction)
+            return false;
+        const resolved = this._resolve({action: current.submenuAction, target: null});
+        if (!resolved.enabled || resolved.group.get_action_state(resolved.name)?.get_type_string() !== 'b')
+            return false;
+        // Entries disappear when a native model replaces its action generation.
+        for (const [key, value] of this._openSubmenus) {
+            if (!value.group.has_action(value.name))
+                this._openSubmenus.delete(key);
+        }
+        if (open)
+            this._openSubmenus.set(current.submenuAction, resolved);
+        else
+            this._openSubmenus.delete(current.submenuAction);
+        resolved.group.change_action_state(resolved.name, new GLib.Variant('b', open));
+        return true;
+    }
+
     _hideLocalMenubar() {
         // Only remove a local menubar when its original model is imported and
         // the application exports a window-scoped visibility control.
@@ -298,6 +338,11 @@ export class GMenuSource {
         if (this._closed)
             return;
         this._restoreLocalMenubar();
+        for (const {group, name} of this._openSubmenus.values()) {
+            if (group.has_action(name) && group.get_action_state(name)?.get_type_string() === 'b')
+                group.change_action_state(name, new GLib.Variant('b', false));
+        }
+        this._openSubmenus.clear();
         this._closed = true;
         if (this._idle)
             GLib.source_remove(this._idle);

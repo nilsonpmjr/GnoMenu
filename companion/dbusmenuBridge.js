@@ -51,16 +51,21 @@ export class DBusMenuBridge {
             const action = new Gio.SimpleAction(options);
             if (submenu) {
                 let preparing = false;
+                let requestedOpen = false;
                 action.connect('change-state', (_action, value) => {
                     if (this._closed || generation !== this._generation || value.get_type_string() !== 'b')
                         return;
+                    requestedOpen = value.get_boolean();
                     if (value.get_boolean()) {
                         if (preparing)
                             return;
                         preparing = true;
                         this._source.prepare(node).then(prepared => {
-                            if (prepared && !this._closed && generation === this._generation)
-                                action.set_state(value);
+                            if (prepared && !this._closed && generation === this._generation) {
+                                if (!requestedOpen)
+                                    this._source.close(node);
+                                action.set_state(new GLib.Variant('b', requestedOpen));
+                            }
                         }).finally(() => { preparing = false; });
                     } else {
                         this._source.close(node);

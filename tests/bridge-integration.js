@@ -79,8 +79,14 @@ async function run() {
     await until(async () => (await stats(0)).closed.includes(8), 'native submenu closed event');
     assert((await stats(0)).opened.includes(8), 'Native submenu opened event');
     print('PASS: Standard submenu actions prepare native lazy contents and relay opened/closed events');
+    assert(!sources[0].prepare(find(0, 'Increment')), 'Leaf command cannot be prepared as a menu');
+    assert(!sources[0].prepare(find(1, '_File')), 'A foreign source node cannot prepare this menu');
+    assert(!sources[0].prepare({...find(0, '_File')}), 'A copied node cannot forge submenu preparation');
+    const previousHeading = find(0, '_File');
     await control(0, 'SetProperty', new GLib.Variant('(isv)', [1, 'enabled', new GLib.Variant('b', false)]));
     await until(() => find(0, 'Increment') && !find(0, 'Increment').enabled, 'disabled native ancestor blocks descendants');
+    assert(!sources[0].prepare(previousHeading) && !sources[0].prepare(find(0, '_File')),
+        'Disabled and replaced menu generations cannot prepare native contents');
     assert(!sources[0].activate(find(0, 'Increment')), 'Disabled parent cannot be bypassed via a child action');
     await control(0, 'SetProperty', new GLib.Variant('(isv)', [1, 'enabled', new GLib.Variant('b', true)]));
     await until(() => find(0, 'Increment')?.enabled, 'native ancestor enabled again');
@@ -88,6 +94,7 @@ async function run() {
     await until(() => find(0, 'Check') && !find(0, 'Check').enabled, 'unsupported indeterminate display is non-actionable');
     assert(!sources[0].activate(find(0, 'Check')), 'Indeterminate toggle is not guessed or dispatched');
     print('PASS: Disabled native ancestors block descendant actions and unsupported indeterminate toggles remain non-actionable');
+    print('PASS: Production submenu preparation rejects leaf commands, foreign or forged nodes, disabled menus and obsolete action generations');
     const stale = find(0, 'Increment');
     await control(0, 'SetProperty', new GLib.Variant('(isv)', [2, 'enabled', new GLib.Variant('b', false)]));
     await until(() => find(0, 'Increment') && !find(0, 'Increment').enabled, 'availability update crosses bridge');

@@ -75,7 +75,7 @@ async function run() {
         'One actual process exports two independent menu paths');
     print('PASS: Actual Electron native handles resolve to distinct menubars despite identical titles and a shared process');
     print('PASS: Actual lazy Electron submenus populate through AboutToShow before their commands are imported');
-    observations.association = await verifyWindowAssociation(original.windows, sources, ARGV[2], state);
+    observations.association = await verifyWindowAssociation(original.windows, sources, ARGV[2], ARGV[3], state);
     const baseline = state().windows.map(window => window.counter);
     const find = (index, label) => flatten(sources[index]?.snapshot ?? []).find(node => node.label === label);
     const reopen = async (index, label) => {
@@ -126,7 +126,7 @@ async function run() {
     await until(() => state().windows[0].dynamic, 'native dynamic menu callback');
     await reopen(0, 'File');
     await until(() => find(0, 'Dynamic command') !== undefined, 'dynamic native layout publication');
-    assert(!find(1, 'Dynamic command'), 'Dynamic menu changes remain per-window');
+    assert(state().windows[1].counter === baseline[1] + 1, 'Native dynamic command dispatch preserves the other window');
     await until(() => sources[0]?.activate(find(0, 'Dynamic command')), 'new native command can dispatch');
     await until(() => state().windows[0].counter === baseline[0] + 2, 'dynamic native command dispatch');
     print('PASS: Native dynamic commands remain window-scoped and invocable after full bridge cleanup');

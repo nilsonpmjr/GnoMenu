@@ -30,7 +30,12 @@ portuguese = json.loads((reports / 'dev-session/locales/pt_BR.UTF-8/shell-result
 i18n = json.loads((reports / 'i18n.json').read_text())
 real_apps = json.loads((reports / 'dev-session/real-apps/shell-result.json').read_text())
 real_apps_pt = json.loads((reports / 'dev-session/real-apps/locales/pt_BR.UTF-8/shell-result.json').read_text())
-log = (reports / 'dev-session/shell.log').read_text()
+session_logs = [(reports / 'dev-session' / path).read_text() for path in (
+    'shell.log', 'locales/pt_BR.UTF-8/shell.log', 'real-apps/shell.log',
+    'real-apps/locales/pt_BR.UTF-8/shell.log')]
+log_checks = {'gjs_critical_errors': sum(value.count('Gjs-CRITICAL') for value in session_logs),
+              'js_errors': sum(value.count('JS ERROR') for value in session_logs)}
+assert not any(log_checks.values()), log_checks
 assert shell['success'] and portuguese['success'] and all(result['success'] for result in integration.values())
 assert all(result['success'] for result in i18n)
 assert real_apps['success'] and real_apps_pt['success']
@@ -44,7 +49,7 @@ report = {
     'localization': i18n,
     'real_apps': {'inherited': real_apps, 'pt_BR': real_apps_pt,
                  'versions': subprocess.check_output(['rpm', '-q', 'nautilus', 'ptyxis'], text=True).splitlines()},
-    'shell_log_check': {'gjs_critical_errors': log.count('Gjs-CRITICAL'), 'js_errors': log.count('JS ERROR')},
+    'shell_log_check': log_checks,
     'dropdown_alignment': json.loads((reports / 'dev-session/alignment.json').read_text()),
     'bundle_sha256': hashlib.sha256(bundle.read_bytes()).hexdigest(),
     'limits': [

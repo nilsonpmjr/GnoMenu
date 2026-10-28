@@ -1,6 +1,6 @@
 # Controlled Electron menu replay
 
-The replay runs GnoMenu's own application fixture in a staged copy of an installed Electron core. It does not run Signal/Obsidian application code, access their profiles or change their Flatpak permissions. This establishes protocol behavior of one runtime, not application support or panel integration.
+The replay runs GnoMenu's own application fixture in a staged copy of an installed Electron core. It does not run Signal/Obsidian application code, access their profiles or change their Flatpak permissions. This establishes protocol behavior and private panel rendering for one runtime, not vendor application support or normal companion installation.
 
 ## Observed result
 
@@ -11,17 +11,18 @@ Electron `43.8.3`, GNOME Shell `50.6`, Wayland compositor with a private XWaylan
 | XWayland | Two distinct native handles register two menubars through one unique D-Bus owner, with distinct object paths | Both windows have identical titles and the same PID. Discovery uses the fixture's actual native handles, not titles or PIDs. Private X11 property reads corroborate those selected handles. |
 | Lazy menus | File and View populate through `AboutToShow` | Looking only at the initial layout misses real commands. |
 | Invocation | Each menu increments only its own window's counter; a disabled command is rejected | GnoMenu's existing `AppMenuDiscovery` and `DBusMenuSource` are used directly. |
-| GTK association and bridge | Temporary standard X11 GTK properties give each actual Meta window a distinct GMenu/action descriptor. Every exported fixture entry crosses the bridge; imported commands reach only the originating native window | The unchanged production `sourceForWindow` and `GMenuSource` are exercised. The companion uses each pinned DBusMenu descriptor and preserves its hierarchy. This is not a panel rendering test or production identity discovery. Cleanup removes its properties/exports and rejects disposed commands. |
+| GTK association and bridge | Temporary standard X11 GTK properties give each actual Meta window a distinct GMenu/action descriptor. Every exported fixture entry crosses the bridge; imported commands reach only the originating native window | Production `sourceForWindow` and `GMenuSource` are exercised. The companion uses each pinned DBusMenu descriptor and preserves its hierarchy. Cleanup removes its properties/exports and rejects disposed commands. |
+| Actual Shell panel | Native headings, lazy nested contents and dynamic commands are displayed and invoked in the real panel; focus changes and explicit closure remain authoritative | The production renderer runs on a private desktop. Input uses actor APIs, not physical or virtual mouse/keyboard events. Fixture-provided handles establish identity only for this controlled application. See [panel checks](electron-panel.md). |
 | Checkbox | Its native callback changes the selected window's checked value, while the server still advertises `toggle-state=0` after reopening and a 500ms wait | The imported unchecked state agrees with raw `GetLayout`. This is a recorded synchronization gap, not a passing claim for checkbox state fidelity. No local state is invented to conceal the mismatch. |
 | Dynamic layout | A bridged command triggers native model replacement. Standard exported submenu actions prepare the new contents; the new command is imported and invoked through both protocols | The other window's menu remains unchanged. Old-generation imported commands are rejected. |
-| Window close | The first declaration is withdrawn, its source is disposed and its old command is rejected; the remaining window's menu still works | Source lifecycle is managed by the replay's discovery callback; the production Shell integration is still pending. |
+| Window close | The first declaration is withdrawn, its source is disposed and its old command is rejected; the remaining window's menu still works | Discovery withdrawal is checked independently after the panel bridge experiment has been cleaned up. Arbitrary third-party companion lifetime handling remains pending. |
 | Native Wayland | Two actual Wayland windows, no registrar declarations during the recorded interval of at least three seconds | The returned native handles are opaque values and are never coerced into XIDs. This is bounded to this runtime, fixture and interval. |
 
-Eleven XWayland check groups and two Wayland observation groups pass. Passing the replay means those declared checks completed; it does not certify full menu-state fidelity, support for vendor applications or universal Wayland behavior.
+Fifteen XWayland check groups and two Wayland observation groups pass. Shell logs are also checked for JavaScript, GJS, Clutter and St critical errors. Passing the replay means those declared checks completed; it does not certify full menu-state fidelity, support for vendor applications or universal Wayland behavior.
 
-## Why panel integration is still pending
+## Why vendor integration is still pending
 
-The inspected `Meta.Window` objects expose an internal ID different from the XID and do not expose `get_xwindow`. The [GTK property experiment](window-association.md#standard-gtk-property-association-probe) validates a narrow association path using the fixture's exact native handles, without parsing descriptions. The [full-model bridge](menu-bridge.md) now runs through that path. Arbitrary third-party identity/lifecycle handling, production submenu preparation and panel rendering remain pending.
+The inspected `Meta.Window` objects expose an internal ID different from the XID and do not expose `get_xwindow`. The [GTK property experiment](window-association.md#standard-gtk-property-association-probe) validates a narrow association path using the fixture's exact native handles, without parsing descriptions. The [full-model bridge](menu-bridge.md) and [private production panel](electron-panel.md) now run through that path. Arbitrary third-party identity/lifecycle handling, companion installation and actual vendor/Flatpak tests remain pending.
 
 The registrar starts only on the private session bus. GnoMenu does not claim the registrar name in the regular desktop, force a backend change or hide a third-party local menu as part of this experiment. Native Wayland needs a cooperative association/export path. Flatpak permissions and the actual vendor application lifecycle require separate tests.
 
@@ -40,7 +41,7 @@ PATH=/usr/bin:/bin:$PATH /usr/bin/python3 tools/verify-electron.py \
   --runtime /var/lib/flatpak/app/md.obsidian.Obsidian/current/active/files/obsidian
 ```
 
-The selected ELF must permit directory application loading and have compatible host libraries. A launch wrapper is rejected. The harness creates private settings, runtime directory, compositor, bus, registrar and profile, then closes its owned processes. It runs outside Flatpak and leaves the installable extension ZIP unchanged.
+The selected ELF must permit directory application loading and have compatible host libraries. A launch wrapper is rejected. The harness creates a private home, settings, runtime directory, compositor, bus activation environment, registrar and profile, then closes its owned processes. It runs outside Flatpak and does not install the built extension in the regular desktop.
 
 Local artifacts, excluded from Git:
 
@@ -51,8 +52,12 @@ Local artifacts, excluded from Git:
 - `reports/electron-rea.json` and `reports/electron-rea-complete.json`: fuse observations and controlled process Evidence.
 - `reports/electron-association-rea-final.json`: controlled replay including the standard GTK property association probe.
 - `reports/electron-bridge-rea.json`: controlled replay including the full exported-model bridge.
+- `reports/electron-export/x11/electron-panel.png`: the private panel with the imported dynamic command.
+- `reports/electron-panel-stable-rea.json`: controlled replay of the production renderer with nested and dynamic native menus.
 
 ## REA evidence and limits
+
+Private panel replay Evidence: `ev_350a7fcade60a3a6453517c9a49c6c12a25094f43cdaa1495a56b27e5c71cce5`, exit code 0, seventeen check groups and clean critical-error counts in both Shell logs. See [the panel guide](electron-panel.md) for the precise UI/input scope and remaining limits.
 
 Full-model bridge replay Evidence: `ev_b389a558659e6464b10129edfa258737f5835cd3a2803a500407d999eb9e0e07`, exit code 0, thirteen check groups. The unchanged fixture supplies exact handles. The same sampling and coverage limits below apply.
 

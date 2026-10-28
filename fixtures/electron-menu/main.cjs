@@ -33,6 +33,9 @@ app.whenReady().then(async () => {
         const menu = Menu.buildFromTemplate([{label: 'File', submenu: [
             {label: 'Increment this window', click: () => {record.counter++; save();}},
             {label: 'Disabled command', enabled: false, click: () => {record.counter += 100; save();}},
+            {label: 'Tools', submenu: [
+                {label: 'Nested increment', click: () => {record.counter++; save();}},
+            ]},
             {label: 'Add dynamic command', click: () => {
                 if (!record.dynamic) {
                     record.dynamic = true;

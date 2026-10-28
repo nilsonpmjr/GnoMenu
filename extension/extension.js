@@ -34,8 +34,13 @@ function structure(items) {
 
 export default class GnoMenu extends Extension {
     enable() {
+        this._enabled = true;
         this._buttons = [];
+        this._buttonPool = [];
         this._bindings = [];
+        this._menus = [];
+        this._pendingOpenMenus = null;
+        this._emptyMenuEpoch = null;
         this._windowSignals = [];
         this._window = null;
         this._focusedWindow = null;
@@ -48,7 +53,9 @@ export default class GnoMenu extends Extension {
         this._epoch = 0;
         this._renderId = 0;
         this._focusId = 0;
+        this._restoreId = 0;
         this._rendering = false;
+        this._restoringMenus = false;
         this._renderedEpoch = null;
         this._tree = [];
         this._appTree = [];
@@ -64,10 +71,16 @@ export default class GnoMenu extends Extension {
         this._displaySignal = global.display.connect('notify::focus-window', () => this._syncFocus());
         this._createdSignal = global.display.connect('window-created', () => this._queueFocus());
         this._appSignal = Shell.AppSystem.get_default().connect('app-state-changed', () => this._queueFocus());
+        this._panelDestroySignal = Main.panel.connect('destroy', () => this.disable());
         this._syncFocus();
     }
 
     disable() {
+        if (!this._enabled)
+            return;
+        this._enabled = false;
+        Main.panel.disconnect(this._panelDestroySignal);
+        this._panelDestroySignal = 0;
         ++this._epoch;
         global.display.disconnect(this._displaySignal);
         global.display.disconnect(this._createdSignal);
@@ -85,11 +98,11 @@ export default class GnoMenu extends Extension {
         this._source = null;
         this._rendering = true;
         this._clearButtons();
-        for (const id of [this._renderId, this._focusId]) {
+        for (const id of [this._renderId, this._focusId, this._restoreId]) {
             if (id)
                 GLib.source_remove(id);
         }
-        this._renderId = this._focusId = 0;
+        this._renderId = this._focusId = this._restoreId = 0;
         this._window = null;
         this._focusedWindow = null;
         this._tree = [];
@@ -97,9 +110,13 @@ export default class GnoMenu extends Extension {
         this._signature = null;
         this._partial = false;
         this._status = null;
+        this._pendingOpenMenus = null;
+        this._emptyMenuEpoch = null;
     }
 
     _syncFocus() {
+        if (!this._enabled)
+            return;
         const window = global.display.focus_window;
         // A Shell popup can temporarily take keyboard focus away from its client.
         if (!window && (this._rendering || this._buttons.some(button => button.menu.isOpen)))
@@ -167,8 +184,11 @@ export default class GnoMenu extends Extension {
     }
 
     _presentSource() {
+        if (!this._enabled)
+            return;
         const usable = entry => entry && !entry.source.closed &&
-            (entry.tree.length || entry.info.applicationMenu?.length);
+            (entry.tree.length || entry.info.applicationMenu?.length ||
+                (entry.info.available && entry.source.descriptor.menuPath));
         const focused = this._focusedWindow;
         const entry = focused ? (usable(this._focusEntry) ? this._focusEntry : null) :
             usable(this._filesEntry) ? this._filesEntry : null;
@@ -190,7 +210,7 @@ export default class GnoMenu extends Extension {
     }
 
     _queueRender() {
-        if (this._renderId)
+        if (!this._enabled || this._renderId)
             return;
         this._renderId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._renderId = 0;
@@ -200,7 +220,7 @@ export default class GnoMenu extends Extension {
     }
 
     _queueFocus() {
-        if (this._focusId || this._rendering)
+        if (!this._enabled || this._focusId || this._rendering)
             return;
         this._focusId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._focusId = 0;
@@ -210,6 +230,16 @@ export default class GnoMenu extends Extension {
     }
 
     _button(text, index) {
+        const cached = this._buttonPool[index];
+        if (cached) {
+            cached.get_first_child().text = text;
+            cached.accessible_name = text;
+            cached.setSensitive(true);
+            cached.container.show();
+            cached.show();
+            this._buttons.push(cached);
+            return cached;
+        }
         const button = new PanelMenu.Button(0, text);
         // PopupMenu's default source anchor is the centre of the title. For a
         // menubar, anchor its leading edge to the popup's leading edge instead.
@@ -238,10 +268,16 @@ export default class GnoMenu extends Extension {
         });
         Main.panel.addToStatusArea(`${this.uuid}-${index}`, button, index + 1, 'left');
         this._buttons.push(button);
+        this._buttonPool[index] = button;
+        button.connect('destroy', () => {
+            this._buttons = this._buttons.filter(candidate => candidate !== button);
+        });
         return button;
     }
 
     _render() {
+        if (!this._enabled)
+            return;
         const app = this._window ? Shell.WindowTracker.get_default().get_window_app(this._window) :
             Shell.AppSystem.get_default().lookup_app('org.gnome.Nautilus.desktop');
         const appName = app?.get_name() || this._window?.get_wm_class() || this._window?.title || _('Desktop');
@@ -251,26 +287,57 @@ export default class GnoMenu extends Extension {
             return;
         }
         this._signature = signature;
-        const openIndex = this._buttons.findIndex(button => button.menu.isOpen);
-        // Never transfer an open menu to another window during a focus change.
         const sameSource = this._renderedEpoch === this._epoch;
+        const openNow = sameSource ? this._menus.filter(entry => entry.menu.isOpen).map(entry => entry.key) : [];
+        const now = GLib.get_monotonic_time();
+        const pending = this._pendingOpenMenus;
+        if (!pending || pending.epoch !== this._epoch || pending.deadline < now)
+            this._pendingOpenMenus = {epoch: this._epoch, keys: openNow, deadline: now + 500000};
+        else
+            pending.keys = [...new Set([...pending.keys, ...openNow])];
+        const roots = flatten(this._tree);
+        const headings = roots.filter(item => item.kind === 'submenu');
+        const leaves = roots.filter(item => item.kind !== 'submenu');
+        const appItems = [...this._appTree, ...leaves];
+        if (roots.length || appItems.length)
+            this._emptyMenuEpoch = null;
+        // Remote GMenu groups subscribe separately. Do not destroy an open
+        // popup while its replacement model is still arriving in another group.
+        if (sameSource && !roots.length && !appItems.length && this._buttons.length > 1 && this._emptyMenuEpoch !== this._epoch &&
+            this._pendingOpenMenus.deadline > now && this._source?.descriptor?.menuPath) {
+            this._signature = null;
+            for (const {actor} of this._bindings) {
+                if (actor._menuLabNode?.kind === 'item')
+                    actor.setSensitive(false);
+            }
+            this._restoreOpenMenus();
+            return;
+        }
+        // Never transfer an open menu to another window during a focus change.
         this._renderedEpoch = this._epoch;
         this._rendering = true;
         try {
-            this._clearButtons();
-            const roots = flatten(this._tree);
-            const headings = roots.filter(item => item.kind === 'submenu');
-            const leaves = roots.filter(item => item.kind !== 'submenu');
-            const appItems = [...this._appTree, ...leaves];
             const columns = [{label: appName, children: appItems},
-                ...headings.map(item => ({label: label(item.label), children: item.children}))];
+                ...headings.map(item => ({label: label(item.label), children: item.children, node: item}))];
             // Avoid letting an unexpected model create unbounded panel actors.
             if (columns.length > 10) {
                 const overflow = headings.slice(8);
                 columns.splice(9, columns.length - 9, {label: _('More'), children: overflow});
             }
+            this._clearMenuBindings();
+            this._buttons = [];
+            const activeCount = columns.length + (this._source?.truncated ? 1 : 0);
+            for (const [index, button] of this._buttonPool.entries()) {
+                button.menu.removeAll();
+                if (index >= activeCount) {
+                    button.hide();
+                    button.container.hide();
+                }
+            }
             columns.forEach((column, index) => {
                 const button = this._button(column.label || _('Menu'), index);
+                this._watchSubmenu(button.menu, column.node, index === 0 ? 'application' : 'overflow', null, button);
+                button.setSensitive(column.node?.enabled ?? true);
                 this._fill(button.menu, column.children);
                 if (!column.children.length)
                     button.menu.addMenuItem(new PopupMenu.PopupMenuItem(roots.length ?
@@ -287,8 +354,8 @@ export default class GnoMenu extends Extension {
                     {reactive: false}));
             }
             this._updateBindings();
-            if (sameSource && openIndex >= 0)
-                this._buttons[openIndex]?.menu.open();
+            if (sameSource)
+                this._restoreOpenMenus();
         } finally {
             this._rendering = false;
         }
@@ -305,7 +372,12 @@ export default class GnoMenu extends Extension {
             let item;
             if (node.kind === 'submenu') {
                 item = new PopupMenu.PopupSubMenuMenuItem(label(node.label));
+                this._watchSubmenu(item.menu, node, null, menu);
                 this._fill(item.menu, node.children);
+                // Shell refuses to open an empty submenu. Keep it openable so
+                // its native submenu-action can populate the actual contents.
+                if (!node.children.length)
+                    item.menu.addMenuItem(new PopupMenu.PopupMenuItem(_('Application actions unavailable'), {reactive: false}));
             } else {
                 item = new PopupMenu.PopupMenuItem(label(node.label));
                 // Capture source lifetime, not a mutable global current-window pointer.
@@ -331,6 +403,14 @@ export default class GnoMenu extends Extension {
         };
         visit(this._tree);
         visit(this._appTree);
+        for (const entry of this._menus) {
+            if (entry.node)
+                entry.node = byId.get(entry.node.id) ?? entry.node;
+            if (entry.actor && entry.node)
+                entry.actor.setSensitive(entry.node.enabled);
+            if (entry.menu.isOpen && !entry.prepared)
+                entry.prepared = Boolean(entry.source?.prepare?.(entry.node));
+        }
         for (const {id, actor} of this._bindings) {
             const node = byId.get(id);
             actor._menuLabNode = node;
@@ -346,11 +426,94 @@ export default class GnoMenu extends Extension {
     }
 
     _clearButtons() {
-        const buttons = this._buttons;
+        const buttons = this._buttonPool;
+        this._buttonPool = [];
         this._buttons = [];
-        this._bindings = [];
+        this._clearMenuBindings();
         for (const button of buttons)
             button.destroy();
+    }
+
+    _clearMenuBindings() {
+        this._bindings = [];
+        const menus = this._menus;
+        this._menus = [];
+        for (const entry of menus.reverse()) {
+            entry.menu.close();
+            entry.menu.disconnect(entry.signal);
+            entry.menu.actor.disconnect(entry.destroySignal);
+        }
+    }
+
+    _watchSubmenu(menu, node, fallback, parent = null, actor = null) {
+        const entry = {menu, node, source: this._source, prepared: false,
+            parent, actor, key: node ? `${node.id}\u0000${node.label}` : fallback};
+        this._menus.push(entry);
+        entry.destroySignal = menu.actor.connect('destroy', () => {
+            this._menus = this._menus.filter(candidate => candidate !== entry);
+        });
+        entry.signal = menu.connect('open-state-changed', (_menu, open) => {
+            if (open) {
+                if (!this._rendering && !this._restoringMenus) {
+                    this._pendingOpenMenus = {epoch: this._epoch,
+                        keys: this._menus.filter(candidate => candidate.menu.isOpen).map(candidate => candidate.key),
+                        deadline: GLib.get_monotonic_time() + 500000};
+                }
+                entry.prepared = Boolean(entry.source?.prepare?.(entry.node));
+            } else {
+                if (entry.prepared)
+                    entry.source?.close?.(entry.node);
+                entry.prepared = false;
+                if (!this._rendering && this._pendingOpenMenus?.epoch === this._epoch) {
+                    this._pendingOpenMenus.keys = entry.parent ? this._pendingOpenMenus.keys.filter(key =>
+                        key !== entry.key && !key.startsWith(`${entry.node.id}/`)) : [];
+                }
+            }
+        });
+    }
+
+    _restoreOpenMenus() {
+        if (this._restoreId)
+            GLib.source_remove(this._restoreId);
+        // New popup anchors need an allocation before BoxPointer positions the
+        // menu. Nested menus also wait for their parent popup's allocation.
+        this._restoreId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
+            const pending = this._pendingOpenMenus;
+            const waitingEmpty = this._source?.descriptor?.menuPath && this._buttons.length > 1 &&
+                !flatten(this._tree).length && !this._appTree.length && this._emptyMenuEpoch !== this._epoch;
+            if (!pending || (!pending.keys.length && !waitingEmpty) || pending.epoch !== this._epoch || pending.deadline < GLib.get_monotonic_time()) {
+                this._restoreId = 0;
+                if (pending?.epoch === this._epoch && pending.deadline < GLib.get_monotonic_time()) {
+                    pending.keys = [];
+                    if (!flatten(this._tree).length && !this._appTree.length) {
+                        this._emptyMenuEpoch = this._epoch;
+                        for (const entry of this._menus)
+                            entry.menu.close();
+                        this._queueRender();
+                    }
+                }
+                return GLib.SOURCE_REMOVE;
+            }
+            const allocated = actor => actor?.mapped && actor.has_allocation() && actor.width > 0 && actor.height > 0;
+            this._restoringMenus = true;
+            try {
+                for (const key of pending.keys) {
+                    const entry = this._menus.find(candidate => candidate.key === key);
+                    if (!entry || entry.menu.isOpen || (entry.node && !entry.node.enabled) ||
+                        !allocated(entry.menu.sourceActor) ||
+                        (entry.parent && (!entry.parent.isOpen || !allocated(entry.parent.actor))))
+                        continue;
+                    entry.menu.open();
+                }
+            } finally {
+                this._restoringMenus = false;
+            }
+            if (pending.keys.every(key => this._menus.some(entry => entry.key === key && entry.menu.isOpen))) {
+                this._restoreId = 0;
+                return GLib.SOURCE_REMOVE;
+            }
+            return GLib.SOURCE_CONTINUE;
+        });
     }
 
 }
