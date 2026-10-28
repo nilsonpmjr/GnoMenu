@@ -20,6 +20,13 @@ function save() {
         profilePath: path.relative(root, app.getPath('userData')), windows: records};
     fs.writeFileSync(path.join(root, 'electron-state.tmp'), JSON.stringify(state));
     fs.renameSync(path.join(root, 'electron-state.tmp'), path.join(root, 'electron-state.json'));
+    for (const [index, window] of windows.entries()) {
+        if (!window.isDestroyed() && !window.webContents.isLoadingMainFrame()) {
+            const record = records[index];
+            const text = `Window ${index + 1} · Commands received: ${record.counter} · Checked: ${record.checked ? 'on' : 'off'}`;
+            window.webContents.executeJavaScript(`document.getElementById('state').textContent = ${JSON.stringify(text)}`).catch(() => {});
+        }
+    }
 }
 app.whenReady().then(async () => {
     for (let index = 0; index < 2; index++) {
@@ -49,7 +56,10 @@ app.whenReady().then(async () => {
             {label: 'Checked option', type: 'checkbox', click: item => {record.checked = item.checked; save();}},
         ]}]);
         window.setMenu(menu);
-        await window.loadURL('data:text/html,' + encodeURIComponent('<title>GnoMenu Electron Fixture</title><h1>GnoMenu menu export test</h1>'));
+        await window.loadURL('data:text/html,' + encodeURIComponent('<title>GnoMenu Electron Fixture</title>' +
+            '<body style="font:18px sans-serif;padding:24px"><h1>GnoMenu Electron</h1>' +
+            `<p id="state">Window ${index + 1} · Commands received: 0 · Checked: off</p>` +
+            '<p>Use File and View in the top panel.</p></body>'));
         const handle = window.getNativeWindowHandle();
         record.nativeHandleHex = handle.toString('hex');
         if (process.env.GNOMENU_ELECTRON_BACKEND === 'x11')
@@ -60,4 +70,5 @@ app.whenReady().then(async () => {
     console.log('GNOMENU_ELECTRON_READY');
 });
 app.on('window-all-closed', () => app.quit());
-setTimeout(() => app.quit(), 60000);
+if (process.env.GNOMENU_ELECTRON_INTERACTIVE !== '1')
+    setTimeout(() => app.quit(), 60000);

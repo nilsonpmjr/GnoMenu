@@ -15,10 +15,13 @@ export default class ElectronObserver extends Extension {
         this._reply = null;
         this._sequence = null;
         this._stashed = null;
+        this._overviewDismissed = false;
         this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
             const extension = Main.extensionManager.lookup(GLib.getenv('GNOMENU_UUID'))?.stateObj;
-            if (!Main.layoutManager._startingUp && Main.overview.visible)
+            if (!Main.layoutManager._startingUp && !this._overviewDismissed) {
                 Main.overview.hide();
+                this._overviewDismissed = true;
+            }
             const command = GLib.getenv('GNOMENU_ELECTRON_COMMAND');
             if (command && GLib.file_test(command, GLib.FileTest.EXISTS)) {
                 const [, bytes] = GLib.file_get_contents(command);

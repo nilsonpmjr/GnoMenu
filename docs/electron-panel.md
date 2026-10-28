@@ -4,6 +4,8 @@ The controlled replay now runs the production GnoMenu renderer alongside the Ele
 
 This is a fixture experiment on XWayland, outside Flatpak. It does not establish Signal or Obsidian application support or install a companion in the regular desktop.
 
+For manual mouse/keyboard validation in a visible Mutter window, use the [interactive Electron prototype](electron-interactive.md). Its launch and bridge share the isolated harness; the automatic panel driver does not run in interactive mode.
+
 ## Validated behavior
 
 | Trigger | Observed result |

@@ -6,6 +6,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -42,7 +43,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runtime', type=Path, required=True, help='An installed Electron ELF; vendor ASARs are never copied')
     parser.add_argument('--backend', choices=['x11', 'wayland'], required=True)
+    parser.add_argument('--interactive', action='store_true', help='Open a private Mutter development window')
+    parser.add_argument('--duration', type=float, help='Interactive smoke test: stop after N seconds')
     args = parser.parse_args()
+    if args.interactive and args.backend != 'x11':
+        parser.error('The interactive menu demo requires the explicitly selected X11 fixture backend')
+    if args.duration is not None and (not args.interactive or not math.isfinite(args.duration) or args.duration <= 0):
+        parser.error('--duration requires --interactive and a finite positive number')
+    local_viewer = ROOT / 'build/deps/devkit/usr/libexec/mutter-devkit'
+    viewer = Path('/usr/libexec/mutter-devkit')
+    if args.interactive:
+        if not viewer.is_file():
+            viewer = local_viewer
+        if not viewer.is_file():
+            parser.error('mutter-devkit is missing; use tools/bootstrap-devkit.py before this optional demo')
     runtime = args.runtime.resolve(strict=True)
     with runtime.open('rb') as stream:
         if stream.read(4) != b'\x7fELF':
@@ -50,7 +64,7 @@ def main():
     if os.environ.get('GNOMENU_ELECTRON_BUS') != '1':
         return subprocess.call(['dbus-run-session', '--', sys.executable, __file__, *sys.argv[1:]],
                                env=dict(os.environ, GNOMENU_ELECTRON_BUS='1'))
-    report_dir = ROOT / 'reports/electron-export' / args.backend
+    report_dir = ROOT / ('reports/electron-demo' if args.interactive else 'reports/electron-export') / args.backend
     report_dir.mkdir(parents=True, exist_ok=True)
     for name in ['result.json', 'fixture-final.json', 'integration.json', 'integration.json.layouts.json',
                  'integration.json.failure.json', 'integration.json.raw-layout.txt', 'integration.log',
@@ -89,6 +103,9 @@ def main():
                    GNOMENU_ELECTRON_COMMAND=str(command), GNOMENU_UUID=metadata['uuid'],
                    GNOMENU_ELECTRON_REPORT_DIR=str(report_dir),
                    GNOMENU_ELECTRON_BACKEND=args.backend, LIBGL_ALWAYS_SOFTWARE='1', NO_AT_BRIDGE='1')
+        if args.interactive:
+            env['GNOMENU_ELECTRON_INTERACTIVE'] = '1'
+            env['PIPEWIRE_RUNTIME_DIR'] = os.environ.get('PIPEWIRE_RUNTIME_DIR', os.environ['XDG_RUNTIME_DIR'])
         for name in ['DISPLAY', 'XAUTHORITY', 'WAYLAND_DISPLAY', 'LD_PRELOAD', 'NODE_OPTIONS', 'ELECTRON_RUN_AS_NODE']:
             env.pop(name, None)
         # Service activation must inherit the private paths too, rather than
@@ -106,12 +123,27 @@ def main():
             ('org.gnome.shell', 'welcome-dialog-last-shown-version', "'50.0'")]:
             subprocess.run(['gsettings', 'set', schema, key, value], env=env, check=True)
         processes = []
+        shell = None
+        viewer_process = None
         with (report_dir / 'shell.log').open('w') as shell_log, (report_dir / 'app.log').open('w') as app_log:
             try:
                 display = 'gnomenu-electron'
-                shell = subprocess.Popen(['gnome-shell', '--headless', '--virtual-monitor', '1280x800', '--wayland',
+                backend = ['--headless', '--devkit'] if args.interactive else ['--headless', '--virtual-monitor', '1280x800']
+                shell = subprocess.Popen(['gnome-shell', *backend, '--wayland',
                     '--wayland-display', display, '--mode', 'user'], env=env, stdout=shell_log, stderr=subprocess.STDOUT)
                 processes.append(shell)
+                if args.interactive:
+                    wait(lambda: (private_runtime / display).exists(), 'private Wayland display', [shell])
+                    viewer_env = dict(env, XDG_RUNTIME_DIR=os.environ['XDG_RUNTIME_DIR'], GTK_A11Y='none')
+                    for key in ['DISPLAY', 'WAYLAND_DISPLAY', 'XAUTHORITY']:
+                        if key in os.environ:
+                            viewer_env[key] = os.environ[key]
+                    if viewer == local_viewer:
+                        viewer_env['GSETTINGS_SCHEMA_DIR'] = str(viewer.parent.parent / 'share/glib-2.0/schemas')
+                        viewer_env['XDG_DATA_DIRS'] = str(viewer.parent.parent / 'share') + ':' + os.environ.get('XDG_DATA_DIRS', '/usr/local/share:/usr/share')
+                    viewer_process = subprocess.Popen([str(viewer)], env=viewer_env,
+                        stdout=shell_log, stderr=subprocess.STDOUT)
+                    processes.append(viewer_process)
                 ready = wait(lambda: read_json(observation), 'private Shell observer', [shell])
                 registrar = subprocess.Popen([sys.executable, str(ROOT / 'broker/appmenu-registrar.py')], env=env,
                     stdout=subprocess.PIPE, stderr=app_log, text=True)
@@ -157,6 +189,34 @@ def main():
                             stdout=identity_log, stderr=subprocess.STDOUT)
                     identity = read_json(identity_path)
                     assert {entry['windowId'] for entry in identity['identities']} == expected
+                    if args.interactive:
+                        bridge_ready = workspace / 'interactive-bridge.json'
+                        bridge = subprocess.Popen(['gjs', '-m', str(ROOT / 'tests/electron-interactive.js'),
+                            str(identity_path), str(bridge_ready)], env=app_env,
+                            stdout=app_log, stderr=subprocess.STDOUT)
+                        processes.append(bridge)
+                        wait(lambda: read_json(bridge_ready), 'interactive verified bridge', [shell, app, bridge])
+                        print('GnoMenu Electron demo ready. Use File / Tools / View in the private top panel.\n'
+                              'Close the Mutter Development Kit window or press Ctrl+C here to finish.', flush=True)
+                        started = time.monotonic()
+                        reason = 'viewer-closed'
+                        while viewer_process.poll() is None and app.poll() is None:
+                            if shell.poll() is not None or bridge.poll() is not None:
+                                raise RuntimeError('The private Shell or menu bridge exited unexpectedly')
+                            if args.duration is not None and time.monotonic() - started >= args.duration:
+                                reason = 'duration'
+                                break
+                            time.sleep(0.2)
+                        if app.poll() is not None:
+                            reason = 'fixture-closed'
+                        if reason == 'viewer-closed' and viewer_process.returncode:
+                            raise RuntimeError('The Mutter development viewer failed; inspect the private shell.log')
+                        if reason == 'viewer-closed' and args.duration is not None:
+                            raise RuntimeError('The viewer exited before completing the requested smoke duration')
+                        (report_dir / 'result.json').write_text(json.dumps({'success': True, 'mode': 'interactive',
+                            'exit_reason': reason, 'identity': identity,
+                            'duration_seconds': round(time.monotonic() - started, 2)}, indent=2))
+                        return 0
                     for window in state['windows']:
                         properties = subprocess.check_output(['xprop', '-id', hex(window['xid']), '_NET_WM_PID'],
                                                              env=app_env, text=True, timeout=5)
@@ -206,7 +266,7 @@ def main():
             finally:
                 # Main's shutdown handlers can run a nested GLib loop after
                 # destroying panel actors. Stop our observer before termination.
-                if shell.poll() is None and observation.exists():
+                if shell is not None and shell.poll() is None and observation.exists():
                     try:
                         pending = command.with_suffix('.tmp')
                         pending.write_text(json.dumps({'id': 'harness-stop', 'operation': 'stop-observer'}))
@@ -218,7 +278,10 @@ def main():
                 final_state = workspace / 'electron-state.json'
                 if final_state.exists():
                     shutil.copy2(final_state, report_dir / 'fixture-final.json')
-                for process in reversed(processes):
+                cleanup_order = [process for process in reversed(processes) if process is not viewer_process]
+                if viewer_process is not None:
+                    cleanup_order.append(viewer_process)
+                for process in cleanup_order:
                     if process.poll() is None:
                         process.terminate()
                         try:
@@ -236,4 +299,7 @@ def main():
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        raise SystemExit(130)
